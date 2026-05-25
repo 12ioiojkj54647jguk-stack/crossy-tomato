@@ -11,8 +11,9 @@ from config import (
 )
 from renderer import (
     grass_bg, draw_flower, draw_npc, draw_cloud,
-    draw_button, font, font_emoji, ImageTk, ImageCache
+    draw_button, font, tkfont, font_emoji, ImageTk, ImageCache
 )
+from PIL import Image
 from ui.widgets import PILDialog
 
 
@@ -142,7 +143,7 @@ class GardenPanel(tk.Frame):
             # 用 emoji 代替复杂绘制
             bphoto = None
             bid = self.canvas.create_text(bx, by, text="🦋",
-                                          font=font_emoji(14))
+                                          font=("Apple Color Emoji", 14))
             self._butterflies.append({
                 "id": bid, "x": bx, "y": by,
                 "dx": random.choice([-1,1]) * random.uniform(0.3, 0.7),
@@ -162,7 +163,7 @@ class GardenPanel(tk.Frame):
             nid = self.canvas.create_image(npc_x, npc_y, image=npc_photo)
             name_id = self.canvas.create_text(
                 npc_x, npc_y + 40, text=npc_data["name"],
-                fill=self.text_color, font=font(10, bold=True)
+                fill=self.text_color, font=tkfont(10, bold=True)
             )
             self._npcs.append({
                 "id": nid, "name_id": name_id, "photo": npc_photo,
@@ -174,14 +175,14 @@ class GardenPanel(tk.Frame):
         # ─── NPC 区域标签 ───
         self.canvas.create_text(
             npc_x, 25, text="🏘️ 邻居",
-            fill=self.text_color, font=font(10, bold=True)
+            fill=self.text_color, font=tkfont(10, bold=True)
         )
 
         # ─── 种植提示 ───
         if self._selecting_cell and self._pending_seed:
             self.canvas.create_text(
                 w//2, h-15, text="🌱 点击一个空格子种下种子",
-                fill=self.text_color, font=font(12, bold=True),
+                fill=self.text_color, font=tkfont(12, bold=True),
                 tags=("hint",)
             )
 
@@ -280,9 +281,9 @@ class GardenPanel(tk.Frame):
         name = npc["data"]["name"]
         dialog = PILDialog(self.winfo_toplevel(), title=name, width=320, height=180,
                            bg_c=self.colors.get("bg_timer", Colors.BG_TIMER))
-        tk.Label(dialog.body, text=name, font=font(14, bold=True),
+        tk.Label(dialog.body, text=name, font=tkfont(14, bold=True),
                  fg=self.text_color, bg=self.colors.get("bg_timer", Colors.BG_TIMER)).pack(pady=(15,5))
-        tk.Label(dialog.body, text=f"「{line}」", font=font(12),
+        tk.Label(dialog.body, text=f"「{line}」", font=tkfont(12),
                  fg=self.text_color, bg=self.colors.get("bg_timer", Colors.BG_TIMER),
                  wraplength=260, justify="center").pack(pady=10)
         dialog.center_on(self.winfo_toplevel())

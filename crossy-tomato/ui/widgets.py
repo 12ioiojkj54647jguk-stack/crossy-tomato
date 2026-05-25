@@ -3,7 +3,7 @@ PIL 渲染的UI组件：木质按钮、弹窗等
 """
 import tkinter as tk
 from config import Colors
-from renderer import draw_button, font, ImageTk
+from renderer import draw_button, tkfont, ImageTk
 
 
 class PILButton(tk.Label):
@@ -99,7 +99,7 @@ class PILDialog(tk.Toplevel):
         title_frame.pack(fill="x")
         title_frame.pack_propagate(False)
         tk.Label(title_frame, text=f" {title}", bg=Colors.BORDER_OUTER,
-                 fg=Colors.BTN_BG, font=font(13, bold=True),
+                 fg=Colors.BTN_BG, font=tkfont(13, bold=True),
                  anchor="w", padx=10).pack(fill="both", expand=True)
 
         # 内容区

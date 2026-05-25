@@ -3,7 +3,7 @@ PIL 渲染的商店面板
 """
 import tkinter as tk
 from config import Colors, SHOP_ITEMS, FLOWERS, FLOWERS_BY_RARITY
-from renderer import draw_shop_card, font, ImageTk, ImageCache
+from renderer import draw_shop_card, tkfont, font, ImageTk, ImageCache
 from ui.widgets import PILButton, PILDialog
 
 
@@ -30,9 +30,9 @@ class ShopPanel(tk.Frame):
         top.pack(fill="x", padx=15, pady=10)
         self.bell_label = tk.Label(
             top, text=f"💰 铃钱：{self.data.get('bell_count', 0)}",
-            font=font(16, bold=True), fg=self.text_color, bg=self.bg
+            font=tkfont(16, bold=True), fg=self.text_color, bg=self.bg
         ).pack(side="left")
-        tk.Label(top, text="🛒 商店", font=font(16, bold=True),
+        tk.Label(top, text="🛒 商店", font=tkfont(16, bold=True),
                  fg=self.text_color, bg=self.bg).pack(side="right")
 
         # 可滚动商品列表
@@ -101,7 +101,7 @@ class ShopPanel(tk.Frame):
     def _show_result(self, msg):
         d = PILDialog(self.winfo_toplevel(), title="购买成功！", width=300, height=150,
                       bg_c=self.bg)
-        tk.Label(d.body, text=msg, font=font(12),
+        tk.Label(d.body, text=msg, font=tkfont(12),
                  fg=self.text_color, bg=self.bg, justify="center").pack(expand=True, pady=20)
         d.center_on(self.winfo_toplevel())
 

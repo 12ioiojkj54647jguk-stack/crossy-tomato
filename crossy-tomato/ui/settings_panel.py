@@ -3,7 +3,7 @@ PIL 渲染的设置面板
 """
 import tkinter as tk
 from config import Colors, THEMES, DEFAULT_DURATIONS
-from renderer import draw_toggle, draw_slider_track, font, ImageTk, ImageCache
+from renderer import draw_toggle, draw_slider_track, tkfont, font, ImageTk, ImageCache
 from ui.widgets import PILButton, PILDialog
 
 
@@ -27,7 +27,7 @@ class SettingsPanel(tk.Frame):
     def _build_ui(self):
         top = tk.Frame(self, bg=self.bg)
         top.pack(fill="x", padx=15, pady=10)
-        tk.Label(top, text="⚙️ 设置", font=font(16, bold=True),
+        tk.Label(top, text="⚙️ 设置", font=tkfont(16, bold=True),
                  fg=self.text_color, bg=self.bg).pack(side="left")
 
         container = tk.Frame(self, bg=self.bg)
@@ -67,7 +67,7 @@ class SettingsPanel(tk.Frame):
         for key, theme in THEMES.items():
             rb = tk.Radiobutton(
                 self.content, text=theme["name"], variable=self.theme_var, value=key,
-                font=font(11), fg=self.text_color, bg=self.bg,
+                font=tkfont(11), fg=self.text_color, bg=self.bg,
                 selectcolor=self.bg, activebackground=self.bg,
                 command=self._on_theme_change
             )
@@ -78,31 +78,31 @@ class SettingsPanel(tk.Frame):
         PILButton(self.content, text="🗑️ 重置花园", width=140, height=38,
                   bg_c=self.bg, command=self._confirm_reset).pack(pady=5)
         tk.Label(self.content, text="⚠️ 此操作将清空所有花园进度，不可恢复！",
-                 font=font(9), fg="#E57373", bg=self.bg).pack()
+                 font=tkfont(9), fg="#E57373", bg=self.bg).pack()
 
     def _section(self, text):
         tk.Frame(self.content, bg="#C4A484", height=1).pack(fill="x", pady=(15,8))
-        tk.Label(self.content, text=text, font=font(12, bold=True),
+        tk.Label(self.content, text=text, font=tkfont(12, bold=True),
                  fg=self.text_color, bg=self.bg).pack(anchor="w", pady=(0,5))
 
     def _slider(self, label, value, min_v, max_v, key):
         frame = tk.Frame(self.content, bg=self.bg)
         frame.pack(fill="x", pady=3, padx=10)
-        tk.Label(frame, text=label, font=font(11),
+        tk.Label(frame, text=label, font=tkfont(11),
                  fg=self.text_color, bg=self.bg, width=10, anchor="w").pack(side="left")
         var = tk.IntVar(value=value//60)
         tk.Scale(frame, from_=min_v, to=max_v, orient="horizontal", variable=var,
                  bg=self.bg, fg=self.text_color, highlightthickness=0,
                  troughcolor="#C4A484", length=200,
                  command=lambda v,k=key: self._on_dur(k,int(v))).pack(side="left", padx=10)
-        vl = tk.Label(frame, text=f"{value//60} 分钟", font=font(11, bold=True),
+        vl = tk.Label(frame, text=f"{value//60} 分钟", font=tkfont(11, bold=True),
                       fg=self.text_color, bg=self.bg, width=8)
         vl.pack(side="left")
 
     def _switch(self, label, key):
         frame = tk.Frame(self.content, bg=self.bg)
         frame.pack(fill="x", pady=3, padx=10)
-        tk.Label(frame, text=label, font=font(11),
+        tk.Label(frame, text=label, font=tkfont(11),
                  fg=self.text_color, bg=self.bg, anchor="w").pack(side="left")
         var = tk.BooleanVar(value=self.data.get(key, True))
         cb = tk.Checkbutton(frame, variable=var, bg=self.bg,
@@ -126,10 +126,10 @@ class SettingsPanel(tk.Frame):
     def _confirm_reset(self):
         d = PILDialog(self.winfo_toplevel(), title="⚠️ 确认重置", width=350, height=200,
                       bg_c=self.bg)
-        tk.Label(d.body, text="确定要清空花园吗？", font=font(14, bold=True),
+        tk.Label(d.body, text="确定要清空花园吗？", font=tkfont(14, bold=True),
                  fg="#E57373", bg=self.bg).pack(pady=(20,5))
         tk.Label(d.body, text="所有花朵和进度都将丢失，\n此操作不可恢复！",
-                 font=font(11), fg=self.text_color, bg=self.bg, justify="center").pack(pady=5)
+                 font=tkfont(11), fg=self.text_color, bg=self.bg, justify="center").pack(pady=5)
         bf = tk.Frame(d.body, bg=self.bg)
         bf.pack(pady=15)
         PILButton(bf, text="确定重置", width=100, height=35, bg_c=self.bg,

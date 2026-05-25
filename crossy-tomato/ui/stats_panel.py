@@ -4,7 +4,7 @@ PIL 渲染的统计/成就面板
 import tkinter as tk
 from config import Colors, ACHIEVEMENTS, GRID_TOTAL
 from stats import get_stats_summary
-from renderer import draw_stat_card, draw_badge, draw_bar_chart, font, ImageTk, ImageCache
+from renderer import draw_stat_card, draw_badge, draw_bar_chart, tkfont, font, ImageTk, ImageCache
 from datetime import datetime, timedelta
 
 
@@ -23,12 +23,14 @@ class StatsPanel(tk.Frame):
         self.bg = c.get("bg_timer", Colors.BG_TIMER)
         self.text_color = c.get("text", Colors.TEXT)
         self.progress_c = c.get("progress", Colors.PROGRESS)
+        self.highlight = c.get("highlight", Colors.HIGHLIGHT)
+        self.btn_bg = c.get("btn_bg", Colors.BTN_BG)
         self.configure(bg=self.bg)
 
     def _build_ui(self):
         top = tk.Frame(self, bg=self.bg)
         top.pack(fill="x", padx=15, pady=10)
-        tk.Label(top, text="🏆 统计与成就", font=font(16, bold=True),
+        tk.Label(top, text="🏆 统计与成就", font=tkfont(16, bold=True),
                  fg=self.text_color, bg=self.bg).pack(side="left")
 
         container = tk.Frame(self, bg=self.bg)
@@ -74,7 +76,7 @@ class StatsPanel(tk.Frame):
         # ─── 柱状图（PIL 渲染） ───
         chart_frame = tk.Frame(self.content, bg=self.bg)
         chart_frame.pack(fill="x", pady=10)
-        tk.Label(chart_frame, text="📊 最近7天专注趋势", font=font(12, bold=True),
+        tk.Label(chart_frame, text="📊 最近7天专注趋势", font=tkfont(12, bold=True),
                  fg=self.text_color, bg=self.bg).pack(anchor="w", pady=(0,5))
 
         today = datetime.now()
@@ -97,7 +99,7 @@ class StatsPanel(tk.Frame):
         # ─── 成就徽章（PIL 渲染） ───
         ach_frame = tk.Frame(self.content, bg=self.bg)
         ach_frame.pack(fill="x", pady=10)
-        tk.Label(ach_frame, text="🏅 成就徽章", font=font(12, bold=True),
+        tk.Label(ach_frame, text="🏅 成就徽章", font=tkfont(12, bold=True),
                  fg=self.text_color, bg=self.bg).pack(anchor="w", pady=(0,5))
 
         ach_grid = tk.Frame(ach_frame, bg=self.bg)
@@ -115,10 +117,10 @@ class StatsPanel(tk.Frame):
             lbl = tk.Label(cell, image=photo, bg=self.bg)
             lbl._photo = photo
             lbl.pack()
-            tk.Label(cell, text=ach["name"], font=font(9, bold=True),
+            tk.Label(cell, text=ach["name"], font=tkfont(9, bold=True),
                      fg=self.text_color if is_unlocked else "#A08060",
                      bg=self.bg).pack()
-            tk.Label(cell, text=ach["desc"], font=font(8),
+            tk.Label(cell, text=ach["desc"], font=tkfont(8),
                      fg="#888" if is_unlocked else "#B0A090",
                      bg=self.bg, wraplength=120).pack()
 
@@ -133,6 +135,3 @@ class StatsPanel(tk.Frame):
             w.destroy()
         self._build_ui()
 
-    @property
-    def btn_bg(self):
-        return self.colors.get("btn_bg", Colors.BTN_BG)

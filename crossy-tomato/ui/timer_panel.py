@@ -6,7 +6,7 @@ from config import Colors, DEFAULT_DURATIONS
 from ui.widgets import PILButton
 from renderer import (
     wood_frame, draw_timer_display, draw_progress, draw_tab,
-    font, ImageTk, ImageCache
+    tkfont, font, ImageTk, ImageCache
 )
 
 
@@ -94,7 +94,7 @@ class TimerPanel(tk.Frame):
         stats_frame.pack(fill="x", pady=(8, 5))
         self.stats_label = tk.Label(
             stats_frame, text=self._get_stats_text(),
-            font=font(11), fg=self.text_color, bg=self.bg
+            font=tkfont(11), fg=self.text_color, bg=self.bg
         )
         self.stats_label.pack()
 
@@ -150,8 +150,8 @@ class TimerPanel(tk.Frame):
     def _render_timer_display(self, time_str, label):
         """用 PIL 渲染计时显示"""
         self.time_canvas.delete("all")
-        cw = self.time_canvas.winfo_width() or 280
-        ch = self.time_canvas.winfo_height() or 80
+        cw = max(self.time_canvas.winfo_width(), 280)
+        ch = max(self.time_canvas.winfo_height(), 80)
         img = draw_timer_display(cw, ch, time_str, label,
                                  bg_c=self.bg, text_c=self.text_color)
         self._time_photo = ImageTk.PhotoImage(img)
@@ -160,8 +160,8 @@ class TimerPanel(tk.Frame):
     def _render_progress(self, ratio):
         """用 PIL 渲染进度条"""
         self.prog_canvas.delete("all")
-        cw = self.prog_canvas.winfo_width() or 400
-        ch = self.prog_canvas.winfo_height() or 24
+        cw = max(self.prog_canvas.winfo_width(), 100)
+        ch = max(self.prog_canvas.winfo_height(), 24)
         img = draw_progress(cw, ch, ratio, bg_c=self.bg,
                             fill_c=self.progress_c, border_c=self.border_o)
         self._prog_photo = ImageTk.PhotoImage(img)

@@ -30,7 +30,13 @@ class _FontCache:
             return ImageFont.load_default()
 
 def font(size, bold=False):
+    """返回 PIL 字体（供 renderer 内部绘图用）"""
     return _FontCache.get("bold" if bold else "regular", size)
+
+def tkfont(size, bold=False):
+    """返回 tkinter 兼容的字体元组"""
+    weight = "bold" if bold else "normal"
+    return ("PingFang SC", size, weight)
 
 def font_emoji(size):
     return _FontCache.get("emoji", size)
@@ -479,6 +485,7 @@ def draw_progress(w, h, ratio, bg_c="#F5E7C8", fill_c="#FF9F4A",
     key = ImageCache.make_key("prog", w, h, ratio, bg_c, fill_c)
     c = ImageCache.get(key)
     if c: return c
+    w, h = max(w, 10), max(h, 10)
     img = Image.new("RGBA",(w,h),(0,0,0,0))
     d = ImageDraw.Draw(img)
     # 外框
