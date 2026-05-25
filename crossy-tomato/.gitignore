@@ -1,0 +1,25 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+*.egg-info/
+dist/
+build/
+*.egg
+
+# 运行时缓存
+assets/cache/
+
+# 系统文件
+.DS_Store
+.Trash/
+
+# IDE
+.vscode/
+.idea/
+
+# 环境
+.env
+.venv/
+venv/
