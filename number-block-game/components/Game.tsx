@@ -365,6 +365,31 @@ export default function Game() {
             </div>
           </div>
 
+          {/* 结束游戏按钮 */}
+          <button
+            onClick={() => {
+              if (gameOver) return;
+              // 如果有正在下落的方块，先锁定它
+              if (currentPieceRef.current) {
+                const piece = currentPieceRef.current;
+                const currentGrid = gridRef.current;
+                const newGrid = currentGrid.map(row => [...row]);
+                if (piece.y >= 0 && piece.y < ROWS && piece.x >= 0 && piece.x < COLS && newGrid[piece.y][piece.x] === 0) {
+                  newGrid[piece.y][piece.x] = piece.value;
+                  const result = stabilize(newGrid);
+                  setGrid(result.grid);
+                  setScore(prev => prev + result.scoreGained);
+                }
+              }
+              setCurrentPiece(null);
+              setGameOver(true);
+            }}
+            className="bg-[#c0392b] hover:bg-[#e74c3c] text-white font-bold py-2 px-4 rounded-lg transition-colors"
+            disabled={gameOver}
+          >
+            结束游戏
+          </button>
+
           {/* 重新开始按钮 */}
           <button
             onClick={restart}
