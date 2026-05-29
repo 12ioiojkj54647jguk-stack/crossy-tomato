@@ -112,7 +112,9 @@ export default function Game() {
     }
 
     setCurrentPiece(newPiece);
-    setNextValue(generateRandomValue());
+    const newNext = generateRandomValue();
+    setNextValue(newNext);
+    nextValueRef.current = newNext;
   }, []);
 
   // 下落一格
@@ -281,14 +283,18 @@ export default function Game() {
   const restart = useCallback(() => {
     const newGrid = createEmptyGrid();
     const firstValue = generateRandomValue();
+    const nextVal = generateRandomValue();
     const piece = spawnPiece(firstValue);
 
     setGrid(newGrid);
     setCurrentPiece(piece);
-    setNextValue(generateRandomValue());
+    setNextValue(nextVal);
     setScore(0);
     setGameOver(false);
     setIsPaused(false);
+
+    // 同步更新 ref，避免闭包读到旧值
+    nextValueRef.current = nextVal;
   }, []);
 
   // 初始化游戏
