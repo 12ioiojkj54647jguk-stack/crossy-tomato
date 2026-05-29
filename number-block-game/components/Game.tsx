@@ -72,8 +72,22 @@ export default function Game() {
 
     // 将方块固定到网格
     const newGrid = currentGrid.map(row => [...row]);
-    if (piece.y >= 0 && piece.y < ROWS && piece.x >= 0 && piece.x < COLS) {
-      newGrid[piece.y][piece.x] = piece.value;
+
+    // 规则6: 如果当前方块位置已被占据或超出边界，游戏结束
+    if (piece.y < 0 || piece.y >= ROWS || piece.x < 0 || piece.x >= COLS || newGrid[piece.y][piece.x] !== 0) {
+      setGameOver(true);
+      setCurrentPiece(null);
+      return;
+    }
+
+    newGrid[piece.y][piece.x] = piece.value;
+
+    // 规则6: 如果方块锁定在 y=0（顶部），游戏结束
+    if (piece.y === 0) {
+      setGrid(newGrid);
+      setGameOver(true);
+      setCurrentPiece(null);
+      return;
     }
 
     // 执行合并稳定化
@@ -81,7 +95,7 @@ export default function Game() {
     setGrid(result.grid);
     setScore(prev => prev + result.scoreGained);
 
-    // 检查游戏结束
+    // 规则6: 合并或下落后，顶部行有方块（y=0 被占据），游戏结束
     if (checkGameOver(result.grid)) {
       setGameOver(true);
       setCurrentPiece(null);
@@ -90,11 +104,10 @@ export default function Game() {
 
     // 生成新方块（通过 ref 读取最新的 nextValue）
     const newPiece = spawnPiece(nextValueRef.current);
-    // 检查新方块能否放置
+    // 规则6: 新方块生成位置被占据，游戏结束
     if (!isValidMove(result.grid, newPiece.x, newPiece.y)) {
       setGameOver(true);
       setCurrentPiece(null);
-      setGrid(result.grid);
       return;
     }
 

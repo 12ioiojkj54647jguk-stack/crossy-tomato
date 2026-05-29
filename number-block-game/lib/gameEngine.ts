@@ -188,7 +188,7 @@ export function stabilize(grid: Grid): StabilizeResult {
   return { grid: newGrid, scoreGained: totalScore };
 }
 
-// 检查游戏结束（顶部行是否有方块）
+// 检查游戏结束：顶部行（y=0）有任何方块
 export function checkGameOver(grid: Grid): boolean {
   for (let x = 0; x < COLS; x++) {
     if (grid[0][x] !== 0) return true;
