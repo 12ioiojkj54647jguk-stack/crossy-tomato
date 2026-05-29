@@ -215,6 +215,10 @@ export default function Game() {
           e.preventDefault();
           hardDrop();
           break;
+        case " ":
+          e.preventDefault();
+          setIsPaused(p => !p);
+          break;
       }
     };
 
@@ -412,6 +416,7 @@ export default function Game() {
             <div>← → 左右移动</div>
             <div>↓ 加速下落</div>
             <div>↑ 直接落底</div>
+            <div>空白鍵 暫停/繼續</div>
           </div>
         </div>
       </div>
