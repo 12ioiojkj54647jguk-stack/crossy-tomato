@@ -54,11 +54,13 @@ export default function Game() {
   // 使用 ref 同步最新状态（避免闭包陷阱）
   const gridRef = useRef(grid);
   const currentPieceRef = useRef(currentPiece);
+  const nextValueRef = useRef(nextValue);
   const gameOverRef = useRef(gameOver);
   const isPausedRef = useRef(isPaused);
 
   useEffect(() => { gridRef.current = grid; }, [grid]);
   useEffect(() => { currentPieceRef.current = currentPiece; }, [currentPiece]);
+  useEffect(() => { nextValueRef.current = nextValue; }, [nextValue]);
   useEffect(() => { gameOverRef.current = gameOver; }, [gameOver]);
   useEffect(() => { isPausedRef.current = isPaused; }, [isPaused]);
 
@@ -86,8 +88,8 @@ export default function Game() {
       return;
     }
 
-    // 生成新方块
-    const newPiece = spawnPiece(nextValue);
+    // 生成新方块（通过 ref 读取最新的 nextValue）
+    const newPiece = spawnPiece(nextValueRef.current);
     // 检查新方块能否放置
     if (!isValidMove(result.grid, newPiece.x, newPiece.y)) {
       setGameOver(true);
@@ -98,7 +100,7 @@ export default function Game() {
 
     setCurrentPiece(newPiece);
     setNextValue(generateRandomValue());
-  }, [nextValue]);
+  }, []);
 
   // 下落一格
   const moveDown = useCallback(() => {
@@ -147,9 +149,10 @@ export default function Game() {
     while (isValidMove(currentGrid, piece.x, newY + 1)) {
       newY++;
     }
+    // 直接更新 ref，然后同步锁定
+    currentPieceRef.current = { ...piece, y: newY };
     setCurrentPiece({ ...piece, y: newY });
-    // 锁定
-    setTimeout(() => lockPiece(), 0);
+    lockPiece();
   }, [lockPiece]);
 
   // 键盘事件

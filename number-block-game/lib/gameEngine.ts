@@ -94,15 +94,15 @@ export function findConnected(grid: Grid, startX: number, startY: number, visite
   return positions;
 }
 
-// 计算连通块的放置位置（中间位置，取左上优先）
+// 计算连通块的放置位置：取最左上的格子（x 最小，x 相同时 y 最小）
 export function calcPlacePosition(positions: Position[]): Position {
-  const sortedX = positions.map(p => p.x).sort((a, b) => a - b);
-  const sortedY = positions.map(p => p.y).sort((a, b) => a - b);
-  const midIndex = Math.floor(positions.length / 2);
-  return {
-    x: sortedX[midIndex],
-    y: sortedY[midIndex],
-  };
+  let best = positions[0];
+  for (const p of positions) {
+    if (p.x < best.x || (p.x === best.x && p.y < best.y)) {
+      best = p;
+    }
+  }
+  return { x: best.x, y: best.y };
 }
 
 // 查找所有可合并的连通块（大小 >= 3）
@@ -143,20 +143,22 @@ export function applyGravity(grid: Grid): void {
   }
 }
 
-// 执行一次合并操作
+// 执行一次合并操作：先全部清除，再全部放置（同位置冲突则累加）
 export function applyMerges(grid: Grid, merges: MergeResult[]): number {
   let score = 0;
 
+  // 第一步：清除所有连通块格子
   for (const merge of merges) {
     score += merge.sum * 10;
-
-    // 清除连通块所有格子
     for (const pos of merge.positions) {
       grid[pos.y][pos.x] = 0;
     }
+  }
 
-    // 在放置位置放入合并后的值
-    grid[merge.placeAt.y][merge.placeAt.x] = merge.sum;
+  // 第二步：在放置位置放入合并后的值（同位置累加）
+  for (const merge of merges) {
+    const { x, y } = merge.placeAt;
+    grid[y][x] += merge.sum;
   }
 
   return score;
