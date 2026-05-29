@@ -42,6 +42,29 @@ function getTextColor(value: number): string {
   return value <= 4 ? "#776e65" : "#f9f6f2";
 }
 
+// 兼容的圆角矩形绘制（roundRect 在旧版 Safari 不支持）
+function drawRoundRect(
+  ctx: CanvasRenderingContext2D,
+  x: number,
+  y: number,
+  w: number,
+  h: number,
+  r: number
+) {
+  ctx.beginPath();
+  ctx.moveTo(x + r, y);
+  ctx.lineTo(x + w - r, y);
+  ctx.arcTo(x + w, y, x + w, y + r, r);
+  ctx.lineTo(x + w, y + h - r);
+  ctx.arcTo(x + w, y + h, x + w - r, y + h, r);
+  ctx.lineTo(x + r, y + h);
+  ctx.arcTo(x, y + h, x, y + h - r, r);
+  ctx.lineTo(x, y + r);
+  ctx.arcTo(x, y, x + r, y, r);
+  ctx.closePath();
+  ctx.fill();
+}
+
 export default function Game() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [grid, setGrid] = useState<Grid>(createEmptyGrid);
@@ -230,7 +253,7 @@ export default function Game() {
         const py = y * CELL_SIZE + 2;
         const size = CELL_SIZE - 4;
         ctx.beginPath();
-        ctx.roundRect(px, py, size, size, 4);
+        drawRoundRect(ctx, px, py, size, size, 4);
         ctx.fill();
 
         if (value !== 0) {
@@ -252,7 +275,7 @@ export default function Game() {
         const py = y * CELL_SIZE + 2;
         const size = CELL_SIZE - 4;
         ctx.beginPath();
-        ctx.roundRect(px, py, size, size, 4);
+        drawRoundRect(ctx, px, py, size, size, 4);
         ctx.fill();
 
         ctx.fillStyle = getTextColor(value);
@@ -294,6 +317,7 @@ export default function Game() {
     setIsPaused(false);
 
     // 同步更新 ref，避免闭包读到旧值
+    currentPieceRef.current = piece;
     nextValueRef.current = nextVal;
   }, []);
 
