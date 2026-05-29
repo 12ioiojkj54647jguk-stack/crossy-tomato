@@ -143,23 +143,29 @@ export function applyGravity(grid: Grid): void {
   }
 }
 
-// 执行一次合并操作：先全部清除，再全部放置（同位置冲突则累加）
-export function applyMerges(grid: Grid, merges: MergeResult[]): number {
-  let score = 0;
-
-  // 第一步：清除所有连通块格子
+// 从多个连通块中选一个进行合并：选最靠下的（y 最大），y 相同时选最靠左的（x 最小）
+export function selectOneMerge(merges: MergeResult[]): MergeResult {
+  let best = merges[0];
   for (const merge of merges) {
-    score += merge.sum * 10;
-    for (const pos of merge.positions) {
-      grid[pos.y][pos.x] = 0;
+    if (merge.placeAt.y > best.placeAt.y ||
+        (merge.placeAt.y === best.placeAt.y && merge.placeAt.x < best.placeAt.x)) {
+      best = merge;
     }
   }
+  return best;
+}
 
-  // 第二步：在放置位置放入合并后的值（同位置累加）
-  for (const merge of merges) {
-    const { x, y } = merge.placeAt;
-    grid[y][x] += merge.sum;
+// 执行单次合并操作：清除该连通块所有格子，在放置位置放入合并后的值
+export function applySingleMerge(grid: Grid, merge: MergeResult): number {
+  const score = merge.sum * 10;
+
+  // 清除连通块所有格子
+  for (const pos of merge.positions) {
+    grid[pos.y][pos.x] = 0;
   }
+
+  // 在放置位置放入合并后的值
+  grid[merge.placeAt.y][merge.placeAt.x] += merge.sum;
 
   return score;
 }
@@ -174,7 +180,8 @@ export function stabilize(grid: Grid): StabilizeResult {
     const merges = findAllMerges(newGrid);
     if (merges.length === 0) break;
 
-    totalScore += applyMerges(newGrid, merges);
+    const selected = selectOneMerge(merges);
+    totalScore += applySingleMerge(newGrid, selected);
     applyGravity(newGrid);
   }
 
