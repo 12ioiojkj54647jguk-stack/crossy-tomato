@@ -6,12 +6,15 @@ import {
   ROWS,
   createEmptyGrid,
   generateRandomValue,
+  generateSpecialValue,
   spawnPiece,
   isValidMove,
   stabilize,
   checkGameOver,
+  applyBomb,
   type Grid,
   type Piece,
+  type Position,
 } from "@/lib/gameEngine";
 
 const CELL_SIZE = 30;
@@ -31,10 +34,19 @@ const VALUE_COLORS: Record<number, { bg: string; text: string }> = {
   512:   { bg: "#E0F7F0", text: "#1A6B5A" },
   1024:  { bg: "#E6E0FF", text: "#3D2D6B" },
   2048:  { bg: "#FFE0F0", text: "#6B1A4A" },
+  // Special blocks
+  0:     { bg: "#333333", text: "#FFFFFF" },  // Bomb
+  [-1]:  { bg: "#E1F3FE", text: "#1F6C9F" },  // Ice
 };
 
 function getBlockStyle(value: number) {
   return VALUE_COLORS[value] || { bg: "#111111", text: "#FFFFFF" };
+}
+
+function getBlockDisplay(value: number): string {
+  if (value === 0) return "💣";
+  if (value === -1) return "❄️";
+  return String(value);
 }
 
 function drawRoundRect(
@@ -57,6 +69,17 @@ function drawRoundRect(
   ctx.arcTo(x, y, x + r, y, r);
   ctx.closePath();
   ctx.fill();
+}
+
+// Particle system
+interface Particle {
+  x: number;
+  y: number;
+  vx: number;
+  vy: number;
+  life: number;
+  color: string;
+  size: number;
 }
 
 // Leaderboard helpers
@@ -93,6 +116,14 @@ function addToLeaderboard(score: number): LeaderboardEntry[] {
   return trimmed;
 }
 
+// Game state for undo
+interface GameState {
+  grid: Grid;
+  score: number;
+  combo: number;
+  nextValue: number;
+}
+
 export default function Game() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [grid, setGrid] = useState<Grid>(createEmptyGrid);
@@ -106,6 +137,13 @@ export default function Game() {
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
   const [showLeaderboard, setShowLeaderboard] = useState(false);
   const [rank, setRank] = useState<number | null>(null);
+  
+  // New features state
+  const [particles, setParticles] = useState<Particle[]>([]);
+  const [floatingScores, setFloatingScores] = useState<{ x: number; y: number; value: number; life: number }[]>([]);
+  const [undoCount, setUndoCount] = useState(0);
+  const [isFrozen, setIsFrozen] = useState(false);
+  const [showShareButton, setShowShareButton] = useState(false);
 
   const gridRef = useRef(grid);
   const currentPieceRef = useRef(currentPiece);
@@ -115,6 +153,15 @@ export default function Game() {
   const isFastDropRef = useRef(false);
   const comboRef = useRef(0);
   const comboTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const undoHistoryRef = useRef<GameState[]>([]);
+  const isFrozenRef = useRef(false);
+  const frozenTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const pieceCountRef = useRef(0);
+  const particlesRef = useRef<Particle[]>([]);
+  const animationFrameRef = useRef<number | null>(null);
+
+  // Touch state
+  const touchStartRef = useRef<{ x: number; y: number; time: number } | null>(null);
 
   useEffect(() => { gridRef.current = grid; }, [grid]);
   useEffect(() => { currentPieceRef.current = currentPiece; }, [currentPiece]);
@@ -122,10 +169,57 @@ export default function Game() {
   useEffect(() => { gameOverRef.current = gameOver; }, [gameOver]);
   useEffect(() => { isPausedRef.current = isPaused; }, [isPaused]);
   useEffect(() => { comboRef.current = combo; }, [combo]);
+  useEffect(() => { isFrozenRef.current = isFrozen; }, [isFrozen]);
 
   // Load leaderboard on mount
   useEffect(() => {
     setLeaderboard(loadLeaderboard());
+  }, []);
+
+  // Particle animation loop
+  useEffect(() => {
+    const animate = () => {
+      if (particlesRef.current.length > 0) {
+        particlesRef.current = particlesRef.current
+          .map(p => ({
+            ...p,
+            x: p.x + p.vx,
+            y: p.y + p.vy,
+            vy: p.vy + 0.3, // gravity
+            life: p.life - 1,
+            size: p.size * 0.97,
+          }))
+          .filter(p => p.life > 0);
+        setParticles([...particlesRef.current]);
+      }
+      animationFrameRef.current = requestAnimationFrame(animate);
+    };
+    animationFrameRef.current = requestAnimationFrame(animate);
+    return () => {
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current);
+      }
+    };
+  }, []);
+
+  // Spawn particles at position
+  const spawnParticles = useCallback((x: number, y: number, color: string) => {
+    const newParticles: Particle[] = [];
+    for (let i = 0; i < 12; i++) {
+      const angle = (Math.PI * 2 * i) / 12 + Math.random() * 0.5;
+      const speed = 2 + Math.random() * 3;
+      newParticles.push({
+        x: x * CELL_SIZE + CELL_SIZE / 2,
+        y: y * CELL_SIZE + CELL_SIZE / 2,
+        vx: Math.cos(angle) * speed,
+        vy: Math.sin(angle) * speed - 2,
+        life: 40 + Math.random() * 20,
+        color,
+        size: 4 + Math.random() * 3,
+      });
+    }
+    particlesRef.current = [...particlesRef.current, ...newParticles].slice(-50);
+    setParticles([...particlesRef.current]);
   }, []);
 
   // Calculate ghost position
@@ -155,16 +249,53 @@ export default function Game() {
     }, 3000);
   }, []);
 
+  // Save state for undo
+  const saveStateForUndo = useCallback(() => {
+    const state: GameState = {
+      grid: gridRef.current.map(row => [...row]),
+      score: score,
+      combo: comboRef.current,
+      nextValue: nextValueRef.current,
+    };
+    undoHistoryRef.current.push(state);
+    if (undoHistoryRef.current.length > 3) {
+      undoHistoryRef.current.shift();
+    }
+    setUndoCount(undoHistoryRef.current.length);
+  }, [score]);
+
+  // Undo function
+  const undo = useCallback(() => {
+    if (undoHistoryRef.current.length === 0 || gameOverRef.current || isPausedRef.current) return;
+    const state = undoHistoryRef.current.pop()!;
+    setGrid(state.grid);
+    setScore(state.score);
+    setCombo(state.combo);
+    setNextValue(state.nextValue);
+    setUndoCount(undoHistoryRef.current.length);
+    
+    // Spawn piece from saved next value
+    const piece = spawnPiece(state.nextValue);
+    if (isValidMove(state.grid, piece.x, piece.y)) {
+      setCurrentPiece(piece);
+      currentPieceRef.current = piece;
+    }
+  }, []);
+
   const lockPiece = useCallback(() => {
     const piece = currentPieceRef.current;
     const currentGrid = gridRef.current;
     if (!piece) return;
+
+    // Save state before locking
+    saveStateForUndo();
 
     const newGrid = currentGrid.map(row => [...row]);
 
     if (piece.y < 0 || piece.y >= ROWS || piece.x < 0 || piece.x >= COLS || newGrid[piece.y][piece.x] !== 0) {
       setGameOver(true);
       setCurrentPiece(null);
+      setShowShareButton(true);
       return;
     }
 
@@ -174,18 +305,72 @@ export default function Game() {
       setGrid(newGrid);
       setGameOver(true);
       setCurrentPiece(null);
+      setShowShareButton(true);
+      return;
+    }
+
+    // Handle special blocks
+    if (piece.value === 0) {
+      // Bomb: clear 3x3 area
+      const cleared = applyBomb(newGrid, piece.x, piece.y);
+      const result = stabilize(newGrid);
+      setGrid(result.grid);
+      setScore(prev => prev + result.scoreGained + cleared.length * 5);
+      
+      // Spawn particles for bomb
+      spawnParticles(piece.x, piece.y, "#9F2F2D");
+      for (const pos of cleared) {
+        spawnParticles(pos.x, pos.y, "#F2B179");
+      }
+      
+      setShowShareButton(true);
+      setCurrentPiece(null);
+      setGameOver(true);
+      return;
+    }
+
+    if (piece.value === -1) {
+      // Ice: freeze gravity for 3 seconds
+      newGrid[piece.y][piece.x] = -1;
+      setGrid(newGrid);
+      setIsFrozen(true);
+      
+      if (frozenTimerRef.current) clearTimeout(frozenTimerRef.current);
+      frozenTimerRef.current = setTimeout(() => {
+        setIsFrozen(false);
+      }, 3000);
+      
+      // Continue with next piece
+      const newPiece = spawnPiece(nextValueRef.current);
+      if (!isValidMove(newGrid, newPiece.x, newPiece.y)) {
+        setGameOver(true);
+        setCurrentPiece(null);
+        setShowShareButton(true);
+        return;
+      }
+      setCurrentPiece(newPiece);
+      const newNext = generateRandomValue();
+      setNextValue(newNext);
+      nextValueRef.current = newNext;
+      pieceCountRef.current++;
       return;
     }
 
     const result = stabilize(newGrid);
+    
+    // Spawn particles for merges
+    if (result.mergePositions.length > 0) {
+      const { text } = getBlockStyle(piece.value);
+      for (const pos of result.mergePositions.slice(0, 5)) {
+        spawnParticles(pos.x, pos.y, text);
+      }
+    }
+
     const mergeCount = result.scoreGained > 0 ? Math.max(1, Math.round(result.scoreGained / 10 / piece.value)) : 0;
     
     // Update combo if merges happened
     if (mergeCount > 0) {
-      setCombo(prev => {
-        const newCombo = prev + mergeCount;
-        return newCombo;
-      });
+      setCombo(prev => prev + mergeCount);
       resetComboTimer();
     }
 
@@ -193,37 +378,55 @@ export default function Game() {
     const comboMultiplier = Math.min(comboRef.current, 10);
     const finalScore = result.scoreGained * (1 + comboMultiplier * 0.5);
     
+    // Add floating score
+    if (result.scoreGained > 0) {
+      setFloatingScores(prev => [...prev, {
+        x: piece.x,
+        y: piece.y,
+        value: Math.round(finalScore),
+        life: 60,
+      }]);
+    }
+    
     setGrid(result.grid);
     setScore(prev => prev + Math.round(finalScore));
 
     if (checkGameOver(result.grid)) {
       setGameOver(true);
       setCurrentPiece(null);
-      // Add to leaderboard
       const newLeaderboard = addToLeaderboard(score + Math.round(finalScore));
       setLeaderboard(newLeaderboard);
       const playerRank = newLeaderboard.findIndex(e => e.score === (score + Math.round(finalScore))) + 1;
       if (playerRank > 0) setRank(playerRank);
+      setShowShareButton(true);
       return;
     }
 
-    const newPiece = spawnPiece(nextValueRef.current);
+    // Generate next piece (with chance for special)
+    pieceCountRef.current++;
+    let newNextValue: number;
+    if (pieceCountRef.current % 10 === 0) {
+      newNextValue = generateSpecialValue();
+    } else {
+      newNextValue = generateRandomValue();
+    }
+    
+    const newPiece = spawnPiece(newNextValue);
     if (!isValidMove(result.grid, newPiece.x, newPiece.y)) {
       setGameOver(true);
       setCurrentPiece(null);
-      // Add to leaderboard
       const newLeaderboard = addToLeaderboard(score + Math.round(finalScore));
       setLeaderboard(newLeaderboard);
       const playerRank = newLeaderboard.findIndex(e => e.score === (score + Math.round(finalScore))) + 1;
       if (playerRank > 0) setRank(playerRank);
+      setShowShareButton(true);
       return;
     }
 
     setCurrentPiece(newPiece);
-    const newNext = generateRandomValue();
-    setNextValue(newNext);
-    nextValueRef.current = newNext;
-  }, [resetComboTimer, score]);
+    setNextValue(newNextValue);
+    nextValueRef.current = newNextValue;
+  }, [resetComboTimer, score, saveStateForUndo, spawnParticles]);
 
   const moveDown = useCallback(() => {
     const piece = currentPieceRef.current;
@@ -286,18 +489,35 @@ export default function Game() {
         const result = stabilize(newGrid);
         setGrid(result.grid);
         setScore(prev => prev + result.scoreGained);
+        spawnParticles(piece.x, piece.y, getBlockStyle(piece.value).text);
       }
     }
     setCurrentPiece(null);
     setGameOver(true);
+    setShowShareButton(true);
     // Add to leaderboard
     const newLeaderboard = addToLeaderboard(score);
     setLeaderboard(newLeaderboard);
     const playerRank = newLeaderboard.findIndex(e => e.score === score) + 1;
     if (playerRank > 0) setRank(playerRank);
+  }, [score, spawnParticles]);
+
+  // Share function
+  const shareScore = useCallback(async () => {
+    const text = `我在數字消除方塊獲得了 ${score} 分！你能超越我嗎？`;
+    if (navigator.share) {
+      try {
+        await navigator.share({ title: "數字消除方塊", text });
+      } catch {
+        // User cancelled
+      }
+    } else {
+      await navigator.clipboard.writeText(text);
+      alert("已複製到剪貼簿！");
+    }
   }, [score]);
 
-  // 键盘事件
+  // Keyboard events
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (gameOverRef.current) return;
@@ -324,6 +544,11 @@ export default function Game() {
           e.preventDefault();
           setIsPaused(p => !p);
           break;
+        case "z":
+        case "Z":
+          e.preventDefault();
+          undo();
+          break;
       }
     };
 
@@ -339,18 +564,82 @@ export default function Game() {
       window.removeEventListener("keydown", handleKeyDown);
       window.removeEventListener("keyup", handleKeyUp);
     };
-  }, [moveLeft, moveRight, moveDown, hardDrop]);
+  }, [moveLeft, moveRight, moveDown, hardDrop, undo]);
 
-  // 自动下落
+  // Touch events
   useEffect(() => {
-    if (gameOver || isPaused || !currentPiece) return;
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+
+    const handleTouchStart = (e: TouchEvent) => {
+      if (gameOverRef.current || isPausedRef.current) return;
+      const touch = e.touches[0];
+      touchStartRef.current = { x: touch.clientX, y: touch.clientY, time: Date.now() };
+    };
+
+    const handleTouchEnd = (e: TouchEvent) => {
+      if (!touchStartRef.current || gameOverRef.current || isPausedRef.current) return;
+      const touch = e.changedTouches[0];
+      const dx = touch.clientX - touchStartRef.current.x;
+      const dy = touch.clientY - touchStartRef.current.y;
+      const dt = Date.now() - touchStartRef.current.time;
+
+      // Tap (for pause)
+      if (Math.abs(dx) < 10 && Math.abs(dy) < 10 && dt < 200) {
+        setIsPaused(p => !p);
+        touchStartRef.current = null;
+        return;
+      }
+
+      // Swipe
+      if (Math.abs(dx) > 30 || Math.abs(dy) > 30) {
+        if (Math.abs(dx) > Math.abs(dy)) {
+          // Horizontal
+          if (dx > 0) moveRight();
+          else moveLeft();
+        } else {
+          // Vertical
+          if (dy > 30) {
+            isFastDropRef.current = true;
+            moveDown();
+          } else if (dy < -30) {
+            hardDrop();
+          }
+        }
+      }
+
+      touchStartRef.current = null;
+    };
+
+    canvas.addEventListener("touchstart", handleTouchStart, { passive: true });
+    canvas.addEventListener("touchend", handleTouchEnd, { passive: true });
+    return () => {
+      canvas.removeEventListener("touchstart", handleTouchStart);
+      canvas.removeEventListener("touchend", handleTouchEnd);
+    };
+  }, [moveLeft, moveRight, moveDown, hardDrop, isPaused]);
+
+  // Auto drop (with freeze support)
+  useEffect(() => {
+    if (gameOver || isPaused || !currentPiece || isFrozen) return;
 
     const interval = setInterval(() => {
       moveDown();
     }, isFastDropRef.current ? 100 : 500);
 
     return () => clearInterval(interval);
-  }, [gameOver, isPaused, currentPiece, moveDown]);
+  }, [gameOver, isPaused, currentPiece, moveDown, isFrozen]);
+
+  // Floating scores animation
+  useEffect(() => {
+    if (floatingScores.length === 0) return;
+    const interval = setInterval(() => {
+      setFloatingScores(prev => 
+        prev.map(s => ({ ...s, y: s.y - 0.1, life: s.life - 1 })).filter(s => s.life > 0)
+      );
+    }, 16);
+    return () => clearInterval(interval);
+  }, [floatingScores.length]);
 
   // Canvas 渲染
   useEffect(() => {
@@ -360,11 +649,11 @@ export default function Game() {
     if (!ctx) return;
 
     // 背景 - 暖白
-    ctx.fillStyle = "#F7F6F3";
+    ctx.fillStyle = isFrozen ? "#E8F4FD" : "#F7F6F3";
     ctx.fillRect(0, 0, BOARD_WIDTH, BOARD_HEIGHT);
 
-    // 网格线 - 极淡
-    ctx.strokeStyle = "#EAEAEA";
+    // 網格線 - 極淡
+    ctx.strokeStyle = isFrozen ? "#B8D4E8" : "#EAEAEA";
     ctx.lineWidth = 1;
     for (let x = 0; x <= COLS; x++) {
       ctx.beginPath();
@@ -379,7 +668,14 @@ export default function Game() {
       ctx.stroke();
     }
 
-    // 方块
+    // 冰凍效果邊框
+    if (isFrozen) {
+      ctx.strokeStyle = "#1F6C9F";
+      ctx.lineWidth = 3;
+      ctx.strokeRect(2, 2, BOARD_WIDTH - 4, BOARD_HEIGHT - 4);
+    }
+
+    // 方塊
     for (let y = 0; y < ROWS; y++) {
       for (let x = 0; x < COLS; x++) {
         const value = grid[y][x];
@@ -390,17 +686,26 @@ export default function Game() {
           const py = y * CELL_SIZE + 1;
           const size = CELL_SIZE - 2;
           drawRoundRect(ctx, px, py, size, size, 3);
-          ctx.fillStyle = text;
-          ctx.font = `600 ${value >= 1000 ? 13 : value >= 100 ? 16 : 19}px "SF Pro Display", "Geist Sans", system-ui, sans-serif`;
-          ctx.textAlign = "center";
-          ctx.textBaseline = "middle";
-          ctx.fillText(String(value), x * CELL_SIZE + CELL_SIZE / 2, y * CELL_SIZE + CELL_SIZE / 2);
+          
+          // Draw emoji or number
+          if (value === 0 || value === -1) {
+            ctx.font = "14px sans-serif";
+            ctx.textAlign = "center";
+            ctx.textBaseline = "middle";
+            ctx.fillText(getBlockDisplay(value), x * CELL_SIZE + CELL_SIZE / 2, y * CELL_SIZE + CELL_SIZE / 2);
+          } else {
+            ctx.fillStyle = text;
+            ctx.font = `600 ${value >= 1000 ? 13 : value >= 100 ? 16 : 19}px "SF Pro Display", "Geist Sans", system-ui, sans-serif`;
+            ctx.textAlign = "center";
+            ctx.textBaseline = "middle";
+            ctx.fillText(String(value), x * CELL_SIZE + CELL_SIZE / 2, y * CELL_SIZE + CELL_SIZE / 2);
+          }
         }
       }
     }
 
     // Ghost piece (projection)
-    if (currentPiece && !gameOver && !isPaused) {
+    if (currentPiece && !gameOver && !isPaused && currentPiece.value > 0) {
       const { x, value } = currentPiece;
       const ghostYPos = calculateGhostY(currentPiece, grid);
       if (ghostYPos !== currentPiece.y && ghostYPos >= 0 && ghostYPos < ROWS) {
@@ -421,7 +726,7 @@ export default function Game() {
       }
     }
 
-    // 当前下落方块
+    // Current falling piece
     if (currentPiece) {
       const { x, y, value } = currentPiece;
       if (y >= 0 && y < ROWS) {
@@ -431,13 +736,42 @@ export default function Game() {
         const py = y * CELL_SIZE + 1;
         const size = CELL_SIZE - 2;
         drawRoundRect(ctx, px, py, size, size, 3);
-        ctx.fillStyle = text;
-        ctx.font = `600 ${value >= 1000 ? 13 : value >= 100 ? 16 : 19}px "SF Pro Display", "Geist Sans", system-ui, sans-serif`;
-        ctx.textAlign = "center";
-        ctx.textBaseline = "middle";
-        ctx.fillText(String(value), x * CELL_SIZE + CELL_SIZE / 2, y * CELL_SIZE + CELL_SIZE / 2);
+        
+        if (value === 0 || value === -1) {
+          ctx.font = "14px sans-serif";
+          ctx.textAlign = "center";
+          ctx.textBaseline = "middle";
+          ctx.fillText(getBlockDisplay(value), x * CELL_SIZE + CELL_SIZE / 2, y * CELL_SIZE + CELL_SIZE / 2);
+        } else {
+          ctx.fillStyle = text;
+          ctx.font = `600 ${value >= 1000 ? 13 : value >= 100 ? 16 : 19}px "SF Pro Display", "Geist Sans", system-ui, sans-serif`;
+          ctx.textAlign = "center";
+          ctx.textBaseline = "middle";
+          ctx.fillText(String(value), x * CELL_SIZE + CELL_SIZE / 2, y * CELL_SIZE + CELL_SIZE / 2);
+        }
       }
     }
+
+    // Particles
+    for (const p of particles) {
+      ctx.globalAlpha = p.life / 60;
+      ctx.fillStyle = p.color;
+      ctx.beginPath();
+      ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    ctx.globalAlpha = 1;
+
+    // Floating scores
+    for (const fs of floatingScores) {
+      ctx.globalAlpha = fs.life / 60;
+      ctx.fillStyle = "#9F2F2D";
+      ctx.font = "bold 14px sans-serif";
+      ctx.textAlign = "center";
+      ctx.textBaseline = "middle";
+      ctx.fillText(`+${fs.value}`, fs.x * CELL_SIZE + CELL_SIZE / 2, fs.y * CELL_SIZE);
+    }
+    ctx.globalAlpha = 1;
 
     // Combo display on canvas
     if (combo > 0 && !gameOver && !isPaused) {
@@ -448,7 +782,16 @@ export default function Game() {
       ctx.fillText(`×${combo} COMBO`, 8, 8);
     }
 
-    // Game Over 遮罩
+    // Frozen indicator
+    if (isFrozen && !gameOver && !isPaused) {
+      ctx.fillStyle = "#1F6C9F";
+      ctx.font = `600 12px "SF Pro Display", "Geist Sans", system-ui, sans-serif`;
+      ctx.textAlign = "right";
+      ctx.textBaseline = "top";
+      ctx.fillText("❄️ 冰凍中", BOARD_WIDTH - 8, 8);
+    }
+
+    // Game Over overlay
     if (gameOver) {
       ctx.fillStyle = "rgba(247, 246, 243, 0.85)";
       ctx.fillRect(0, 0, BOARD_WIDTH, BOARD_HEIGHT);
@@ -457,20 +800,26 @@ export default function Game() {
       ctx.font = `600 28px "SF Pro Display", "Geist Sans", system-ui, sans-serif`;
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
-      ctx.fillText("Game Over", BOARD_WIDTH / 2, BOARD_HEIGHT / 2 - 24);
+      ctx.fillText("Game Over", BOARD_WIDTH / 2, BOARD_HEIGHT / 2 - 32);
 
       ctx.fillStyle = "#787774";
       ctx.font = `400 15px "SF Pro Display", "Geist Sans", system-ui, sans-serif`;
-      ctx.fillText(`得分: ${score}`, BOARD_WIDTH / 2, BOARD_HEIGHT / 2 + 8);
+      ctx.fillText(`得分: ${score}`, BOARD_WIDTH / 2, BOARD_HEIGHT / 2);
 
       if (rank !== null && rank <= 10) {
         ctx.fillStyle = "#9F2F2D";
         ctx.font = `600 13px "SF Pro Display", "Geist Sans", system-ui, sans-serif`;
-        ctx.fillText(`🏆 排名第 ${rank}`, BOARD_WIDTH / 2, BOARD_HEIGHT / 2 + 32);
+        ctx.fillText(`🏆 排名第 ${rank}`, BOARD_WIDTH / 2, BOARD_HEIGHT / 2 + 24);
+      }
+
+      if (showShareButton) {
+        ctx.fillStyle = "#111111";
+        ctx.font = `500 12px "SF Pro Display", "Geist Sans", system-ui, sans-serif`;
+        ctx.fillText("點擊分享按鈕分享成績", BOARD_WIDTH / 2, BOARD_HEIGHT / 2 + 52);
       }
     }
 
-    // 暂停遮罩
+    // Pause overlay
     if (isPaused && !gameOver) {
       ctx.fillStyle = "rgba(247, 246, 243, 0.85)";
       ctx.fillRect(0, 0, BOARD_WIDTH, BOARD_HEIGHT);
@@ -481,9 +830,9 @@ export default function Game() {
       ctx.textBaseline = "middle";
       ctx.fillText("Paused", BOARD_WIDTH / 2, BOARD_HEIGHT / 2);
     }
-  }, [grid, currentPiece, gameOver, score, isPaused, combo, ghostY, calculateGhostY, rank]);
+  }, [grid, currentPiece, gameOver, score, isPaused, combo, ghostY, calculateGhostY, rank, particles, floatingScores, isFrozen, showShareButton]);
 
-  // 重新开始
+  // Restart
   const restart = useCallback(() => {
     const newGrid = createEmptyGrid();
     const firstValue = generateRandomValue();
@@ -499,13 +848,21 @@ export default function Game() {
     setCombo(0);
     setRank(null);
     setShowLeaderboard(false);
+    setParticles([]);
+    setFloatingScores([]);
+    setUndoCount(0);
+    setShowShareButton(false);
+    setIsFrozen(false);
 
     currentPieceRef.current = piece;
     nextValueRef.current = nextVal;
     comboRef.current = 0;
+    undoHistoryRef.current = [];
+    pieceCountRef.current = 0;
+    particlesRef.current = [];
   }, []);
 
-  // 初始化
+  // Initialize
   useEffect(() => {
     restart();
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -514,7 +871,7 @@ export default function Game() {
   return (
     <div
       className="flex flex-col items-center gap-8 select-none"
-      style={{ fontFamily: "\"SF Pro Display\", \"Geist Sans\", system-ui, sans-serif" }}
+      style={{ fontFamily: '"SF Pro Display", "Geist Sans", system-ui, sans-serif' }}
     >
       {/* Header */}
       <div className="flex flex-col items-center gap-1">
@@ -527,7 +884,7 @@ export default function Game() {
       </div>
 
       <div className="flex gap-8 items-start">
-        {/* 游戏画布 */}
+        {/* Canvas */}
         <div className="relative">
           <canvas
             ref={canvasRef}
@@ -536,16 +893,16 @@ export default function Game() {
             className="block"
             style={{
               borderRadius: "8px",
-              border: "1px solid #EAEAEA",
-              background: "#F7F6F3",
+              border: isFrozen ? "2px solid #1F6C9F" : "1px solid #EAEAEA",
+              background: isFrozen ? "#E8F4FD" : "#F7F6F3",
             }}
             tabIndex={0}
           />
         </div>
 
-        {/* 侧边栏 */}
+        {/* Sidebar */}
         <div className="flex flex-col gap-4 min-w-[160px]">
-          {/* 得分 - Double Bezel */}
+          {/* Score */}
           <div
             className="p-5"
             style={{
@@ -573,9 +930,22 @@ export default function Game() {
                 🔥 连击 ×{combo}
               </div>
             )}
+            {/* Undo indicator */}
+            {undoCount > 0 && !gameOver && (
+              <div 
+                className="mt-1 text-[10px] px-2 py-1 inline-block"
+                style={{
+                  background: "#E1F3FE",
+                  color: "#1F6C9F",
+                  borderRadius: "4px",
+                }}
+              >
+                ↩️ 可撤销 {undoCount}/3
+              </div>
+            )}
           </div>
 
-          {/* 下一个预览 */}
+          {/* Next preview */}
           <div
             className="p-5"
             style={{
@@ -597,12 +967,18 @@ export default function Game() {
                   border: "1px solid #EAEAEA",
                 }}
               >
-                {nextValue}
+                {getBlockDisplay(nextValue)}
               </div>
             </div>
+            {nextValue === 0 && (
+              <div className="text-[10px] text-[#9F2F2D] mt-2 text-center">💣 炸弹</div>
+            )}
+            {nextValue === -1 && (
+              <div className="text-[10px] text-[#1F6C9F] mt-2 text-center">❄️ 冰凍</div>
+            )}
           </div>
 
-          {/* 排行榜 */}
+          {/* Leaderboard */}
           <div
             className="p-5 cursor-pointer transition-all duration-200"
             style={{
@@ -647,7 +1023,10 @@ export default function Game() {
               </div>
             )}
           </div>
+
+          {/* Controls */}
           <div
+            className="px-5 py-4"
             style={{
               background: "#FFFFFF",
               border: "1px solid #EAEAEA",
@@ -663,6 +1042,7 @@ export default function Game() {
                 ["↓", "加速下落"],
                 ["↑", "直接落底"],
                 ["Space", "暂停 / 继续"],
+                ["Z", "撤销"],
               ].map(([key, desc]) => (
                 <div key={key} className="flex items-center gap-3">
                   <span
@@ -683,9 +1063,34 @@ export default function Game() {
             </div>
           </div>
 
-          {/* 按钮组 */}
+          {/* Buttons */}
           <div className="flex flex-col gap-2">
-            {/* 结束游戏 */}
+            {/* Share button (only shown after game over) */}
+            {showShareButton && (
+              <button
+                onClick={shareScore}
+                className="w-full py-2.5 px-4 text-[13px] font-medium transition-all duration-200 ease-[cubic-bezier(0.16,1,0.3,1)]"
+                style={{
+                  background: "#1F6C9F",
+                  color: "#FFFFFF",
+                  borderRadius: "6px",
+                  border: "none",
+                  cursor: "pointer",
+                }}
+                onMouseEnter={(e) => {
+                  e.currentTarget.style.background = "#155A8A";
+                  e.currentTarget.style.transform = "scale(0.98)";
+                }}
+                onMouseLeave={(e) => {
+                  e.currentTarget.style.background = "#1F6C9F";
+                  e.currentTarget.style.transform = "scale(1)";
+                }}
+              >
+                📤 分享成绩
+              </button>
+            )}
+
+            {/* End game */}
             <button
               onClick={endGame}
               disabled={gameOver}
@@ -713,7 +1118,7 @@ export default function Game() {
               结束游戏
             </button>
 
-            {/* 重新开始 */}
+            {/* Restart */}
             <button
               onClick={restart}
               className="w-full py-2.5 px-4 text-[13px] font-medium transition-all duration-200 ease-[cubic-bezier(0.16,1,0.3,1)]"
@@ -736,7 +1141,7 @@ export default function Game() {
               重新开始
             </button>
 
-            {/* 暂停/继续 */}
+            {/* Pause/Resume */}
             <button
               onClick={() => setIsPaused(p => !p)}
               disabled={gameOver}
