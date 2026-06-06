@@ -59,14 +59,53 @@ function drawRoundRect(
   ctx.fill();
 }
 
+// Leaderboard helpers
+interface LeaderboardEntry {
+  score: number;
+  date: string;
+}
+
+function loadLeaderboard(): LeaderboardEntry[] {
+  if (typeof window === "undefined") return [];
+  try {
+    const raw = localStorage.getItem("number-block-leaderboard");
+    return raw ? JSON.parse(raw) : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveLeaderboard(entries: LeaderboardEntry[]) {
+  if (typeof window === "undefined") return;
+  localStorage.setItem("number-block-leaderboard", JSON.stringify(entries));
+}
+
+function addToLeaderboard(score: number): LeaderboardEntry[] {
+  const entries = loadLeaderboard();
+  const newEntry: LeaderboardEntry = {
+    score,
+    date: new Date().toLocaleDateString("zh-CN"),
+  };
+  entries.push(newEntry);
+  entries.sort((a, b) => b.score - a.score);
+  const trimmed = entries.slice(0, 10);
+  saveLeaderboard(trimmed);
+  return trimmed;
+}
+
 export default function Game() {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const [grid, setGrid] = useState<Grid>(createEmptyGrid);
   const [currentPiece, setCurrentPiece] = useState<Piece | null>(null);
-  const [nextValue, setNextValue] = useState<number>(() => generateRandomValue());
+  const [nextValue, setNextValue] = useState<number>(2);
   const [score, setScore] = useState(0);
   const [gameOver, setGameOver] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
+  const [combo, setCombo] = useState(0);
+  const [ghostY, setGhostY] = useState(0);
+  const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
+  const [showLeaderboard, setShowLeaderboard] = useState(false);
+  const [rank, setRank] = useState<number | null>(null);
 
   const gridRef = useRef(grid);
   const currentPieceRef = useRef(currentPiece);
@@ -74,12 +113,47 @@ export default function Game() {
   const gameOverRef = useRef(gameOver);
   const isPausedRef = useRef(isPaused);
   const isFastDropRef = useRef(false);
+  const comboRef = useRef(0);
+  const comboTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => { gridRef.current = grid; }, [grid]);
   useEffect(() => { currentPieceRef.current = currentPiece; }, [currentPiece]);
   useEffect(() => { nextValueRef.current = nextValue; }, [nextValue]);
   useEffect(() => { gameOverRef.current = gameOver; }, [gameOver]);
   useEffect(() => { isPausedRef.current = isPaused; }, [isPaused]);
+  useEffect(() => { comboRef.current = combo; }, [combo]);
+
+  // Load leaderboard on mount
+  useEffect(() => {
+    setLeaderboard(loadLeaderboard());
+  }, []);
+
+  // Calculate ghost position
+  const calculateGhostY = useCallback((piece: Piece | null, currentGrid: Grid): number => {
+    if (!piece) return 0;
+    let y = piece.y;
+    while (isValidMove(currentGrid, piece.x, y + 1)) {
+      y++;
+    }
+    return y;
+  }, []);
+
+  // Update ghost position when piece or grid changes
+  useEffect(() => {
+    if (currentPiece && !gameOver && !isPaused) {
+      setGhostY(calculateGhostY(currentPiece, grid));
+    }
+  }, [currentPiece, grid, gameOver, isPaused, calculateGhostY]);
+
+  // Reset combo after 3 seconds of no merges
+  const resetComboTimer = useCallback(() => {
+    if (comboTimerRef.current) {
+      clearTimeout(comboTimerRef.current);
+    }
+    comboTimerRef.current = setTimeout(() => {
+      setCombo(0);
+    }, 3000);
+  }, []);
 
   const lockPiece = useCallback(() => {
     const piece = currentPieceRef.current;
@@ -104,12 +178,32 @@ export default function Game() {
     }
 
     const result = stabilize(newGrid);
+    const mergeCount = result.scoreGained > 0 ? Math.max(1, Math.round(result.scoreGained / 10 / piece.value)) : 0;
+    
+    // Update combo if merges happened
+    if (mergeCount > 0) {
+      setCombo(prev => {
+        const newCombo = prev + mergeCount;
+        return newCombo;
+      });
+      resetComboTimer();
+    }
+
+    // Calculate combo multiplier
+    const comboMultiplier = Math.min(comboRef.current, 10);
+    const finalScore = result.scoreGained * (1 + comboMultiplier * 0.5);
+    
     setGrid(result.grid);
-    setScore(prev => prev + result.scoreGained);
+    setScore(prev => prev + Math.round(finalScore));
 
     if (checkGameOver(result.grid)) {
       setGameOver(true);
       setCurrentPiece(null);
+      // Add to leaderboard
+      const newLeaderboard = addToLeaderboard(score + Math.round(finalScore));
+      setLeaderboard(newLeaderboard);
+      const playerRank = newLeaderboard.findIndex(e => e.score === (score + Math.round(finalScore))) + 1;
+      if (playerRank > 0) setRank(playerRank);
       return;
     }
 
@@ -117,6 +211,11 @@ export default function Game() {
     if (!isValidMove(result.grid, newPiece.x, newPiece.y)) {
       setGameOver(true);
       setCurrentPiece(null);
+      // Add to leaderboard
+      const newLeaderboard = addToLeaderboard(score + Math.round(finalScore));
+      setLeaderboard(newLeaderboard);
+      const playerRank = newLeaderboard.findIndex(e => e.score === (score + Math.round(finalScore))) + 1;
+      if (playerRank > 0) setRank(playerRank);
       return;
     }
 
@@ -124,7 +223,7 @@ export default function Game() {
     const newNext = generateRandomValue();
     setNextValue(newNext);
     nextValueRef.current = newNext;
-  }, []);
+  }, [resetComboTimer, score]);
 
   const moveDown = useCallback(() => {
     const piece = currentPieceRef.current;
@@ -191,7 +290,12 @@ export default function Game() {
     }
     setCurrentPiece(null);
     setGameOver(true);
-  }, []);
+    // Add to leaderboard
+    const newLeaderboard = addToLeaderboard(score);
+    setLeaderboard(newLeaderboard);
+    const playerRank = newLeaderboard.findIndex(e => e.score === score) + 1;
+    if (playerRank > 0) setRank(playerRank);
+  }, [score]);
 
   // 键盘事件
   useEffect(() => {
@@ -295,6 +399,28 @@ export default function Game() {
       }
     }
 
+    // Ghost piece (projection)
+    if (currentPiece && !gameOver && !isPaused) {
+      const { x, value } = currentPiece;
+      const ghostYPos = calculateGhostY(currentPiece, grid);
+      if (ghostYPos !== currentPiece.y && ghostYPos >= 0 && ghostYPos < ROWS) {
+        const { bg, text } = getBlockStyle(value);
+        ctx.globalAlpha = 0.2;
+        ctx.fillStyle = bg;
+        const px = x * CELL_SIZE + 1;
+        const py = ghostYPos * CELL_SIZE + 1;
+        const size = CELL_SIZE - 2;
+        drawRoundRect(ctx, px, py, size, size, 3);
+        ctx.globalAlpha = 0.4;
+        ctx.strokeStyle = text;
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        ctx.arc(x * CELL_SIZE + CELL_SIZE / 2, ghostYPos * CELL_SIZE + CELL_SIZE / 2, size / 2 - 2, 0, Math.PI * 2);
+        ctx.stroke();
+        ctx.globalAlpha = 1;
+      }
+    }
+
     // 当前下落方块
     if (currentPiece) {
       const { x, y, value } = currentPiece;
@@ -313,6 +439,15 @@ export default function Game() {
       }
     }
 
+    // Combo display on canvas
+    if (combo > 0 && !gameOver && !isPaused) {
+      ctx.fillStyle = "#9F2F2D";
+      ctx.font = `700 20px "SF Pro Display", "Geist Sans", system-ui, sans-serif`;
+      ctx.textAlign = "left";
+      ctx.textBaseline = "top";
+      ctx.fillText(`×${combo} COMBO`, 8, 8);
+    }
+
     // Game Over 遮罩
     if (gameOver) {
       ctx.fillStyle = "rgba(247, 246, 243, 0.85)";
@@ -322,11 +457,17 @@ export default function Game() {
       ctx.font = `600 28px "SF Pro Display", "Geist Sans", system-ui, sans-serif`;
       ctx.textAlign = "center";
       ctx.textBaseline = "middle";
-      ctx.fillText("Game Over", BOARD_WIDTH / 2, BOARD_HEIGHT / 2 - 16);
+      ctx.fillText("Game Over", BOARD_WIDTH / 2, BOARD_HEIGHT / 2 - 24);
 
       ctx.fillStyle = "#787774";
       ctx.font = `400 15px "SF Pro Display", "Geist Sans", system-ui, sans-serif`;
-      ctx.fillText(`得分: ${score}`, BOARD_WIDTH / 2, BOARD_HEIGHT / 2 + 16);
+      ctx.fillText(`得分: ${score}`, BOARD_WIDTH / 2, BOARD_HEIGHT / 2 + 8);
+
+      if (rank !== null && rank <= 10) {
+        ctx.fillStyle = "#9F2F2D";
+        ctx.font = `600 13px "SF Pro Display", "Geist Sans", system-ui, sans-serif`;
+        ctx.fillText(`🏆 排名第 ${rank}`, BOARD_WIDTH / 2, BOARD_HEIGHT / 2 + 32);
+      }
     }
 
     // 暂停遮罩
@@ -340,7 +481,7 @@ export default function Game() {
       ctx.textBaseline = "middle";
       ctx.fillText("Paused", BOARD_WIDTH / 2, BOARD_HEIGHT / 2);
     }
-  }, [grid, currentPiece, gameOver, score, isPaused]);
+  }, [grid, currentPiece, gameOver, score, isPaused, combo, ghostY, calculateGhostY, rank]);
 
   // 重新开始
   const restart = useCallback(() => {
@@ -355,9 +496,13 @@ export default function Game() {
     setScore(0);
     setGameOver(false);
     setIsPaused(false);
+    setCombo(0);
+    setRank(null);
+    setShowLeaderboard(false);
 
     currentPieceRef.current = piece;
     nextValueRef.current = nextVal;
+    comboRef.current = 0;
   }, []);
 
   // 初始化
@@ -369,7 +514,7 @@ export default function Game() {
   return (
     <div
       className="flex flex-col items-center gap-8 select-none"
-      style={{ fontFamily: '"SF Pro Display", "Geist Sans", system-ui, sans-serif' }}
+      style={{ fontFamily: "\"SF Pro Display\", \"Geist Sans\", system-ui, sans-serif" }}
     >
       {/* Header */}
       <div className="flex flex-col items-center gap-1">
@@ -415,6 +560,19 @@ export default function Game() {
             <div className="text-[28px] font-semibold tracking-[-0.03em] text-[#111111] tabular-nums">
               {score}
             </div>
+            {/* Combo indicator */}
+            {combo > 0 && !gameOver && (
+              <div 
+                className="mt-2 text-[11px] font-semibold px-2 py-1 inline-block"
+                style={{
+                  background: "#FDEBEC",
+                  color: "#9F2F2D",
+                  borderRadius: "4px",
+                }}
+              >
+                🔥 连击 ×{combo}
+              </div>
+            )}
           </div>
 
           {/* 下一个预览 */}
@@ -444,9 +602,52 @@ export default function Game() {
             </div>
           </div>
 
-          {/* 操作说明 */}
+          {/* 排行榜 */}
           <div
-            className="px-5 py-4"
+            className="p-5 cursor-pointer transition-all duration-200"
+            style={{
+              background: showLeaderboard ? "#F7F6F3" : "#FFFFFF",
+              border: "1px solid #EAEAEA",
+              borderRadius: "8px",
+            }}
+            onClick={() => setShowLeaderboard(!showLeaderboard)}
+          >
+            <div className="flex justify-between items-center mb-2">
+              <div className="text-[10px] uppercase tracking-[0.08em] text-[#787774] font-medium">
+                排行榜
+              </div>
+              <div className="text-[10px] text-[#787774]">
+                {showLeaderboard ? "▲" : "▼"}
+              </div>
+            </div>
+            {showLeaderboard ? (
+              <div className="flex flex-col gap-1">
+                {leaderboard.length === 0 ? (
+                  <div className="text-[11px] text-[#AAA] py-2 text-center">
+                    暂无记录
+                  </div>
+                ) : (
+                  leaderboard.slice(0, 5).map((entry, i) => (
+                    <div 
+                      key={i} 
+                      className="flex justify-between text-[11px] py-1"
+                      style={{ color: i === 0 ? "#956400" : i === 1 ? "#787774" : i === 2 ? "#8B3A1A" : "#AAA" }}
+                    >
+                      <span className="font-medium">
+                        {i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : `${i + 1}.`}
+                      </span>
+                      <span className="tabular-nums">{entry.score}</span>
+                    </div>
+                  ))
+                )}
+              </div>
+            ) : (
+              <div className="text-[11px] text-[#787774]">
+                {leaderboard.length > 0 ? `最高: ${leaderboard[0].score}` : "点击展开"}
+              </div>
+            )}
+          </div>
+          <div
             style={{
               background: "#FFFFFF",
               border: "1px solid #EAEAEA",
