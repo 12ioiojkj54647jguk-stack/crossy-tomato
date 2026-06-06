@@ -25,7 +25,6 @@ export interface MergeResult {
 export interface StabilizeResult {
   grid: Grid;
   scoreGained: number;
-  mergePositions: Position[];  // 所有被合并的位置（用於粒子效果）
 }
 
 // 创建空网格
@@ -197,7 +196,6 @@ export function applyBomb(grid: Grid, x: number, y: number): Position[] {
 export function stabilize(grid: Grid): StabilizeResult {
   const newGrid = cloneGrid(grid);
   let totalScore = 0;
-  const allMergePositions: Position[] = [];
 
   // eslint-disable-next-line no-constant-condition
   while (true) {
@@ -206,11 +204,10 @@ export function stabilize(grid: Grid): StabilizeResult {
 
     const selected = selectOneMerge(merges);
     totalScore += applySingleMerge(newGrid, selected);
-    allMergePositions.push(...selected.positions);
     applyGravity(newGrid);
   }
 
-  return { grid: newGrid, scoreGained: totalScore, mergePositions: allMergePositions };
+  return { grid: newGrid, scoreGained: totalScore };
 }
 
 // 檢查遊戲結束：頂部行（y=0）有任何方塊

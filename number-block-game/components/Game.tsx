@@ -6,12 +6,10 @@ import {
   ROWS,
   createEmptyGrid,
   generateRandomValue,
-  generateSpecialValue,
   spawnPiece,
   isValidMove,
   stabilize,
   checkGameOver,
-  applyBomb,
   type Grid,
   type Piece,
   type Position,
@@ -34,20 +32,12 @@ const VALUE_COLORS: Record<number, { bg: string; text: string }> = {
   512:   { bg: "#E0F7F0", text: "#1A6B5A" },
   1024:  { bg: "#E6E0FF", text: "#3D2D6B" },
   2048:  { bg: "#FFE0F0", text: "#6B1A4A" },
-  // Special blocks
-  0:     { bg: "#333333", text: "#FFFFFF" },  // Bomb
-  [-1]:  { bg: "#E1F3FE", text: "#1F6C9F" },  // Ice
 };
 
 function getBlockStyle(value: number) {
   return VALUE_COLORS[value] || { bg: "#111111", text: "#FFFFFF" };
 }
 
-function getBlockDisplay(value: number): string {
-  if (value === 0) return "💣";
-  if (value === -1) return "❄️";
-  return String(value);
-}
 
 function drawRoundRect(
   ctx: CanvasRenderingContext2D,
@@ -69,17 +59,6 @@ function drawRoundRect(
   ctx.arcTo(x, y, x + r, y, r);
   ctx.closePath();
   ctx.fill();
-}
-
-// Particle system
-interface Particle {
-  x: number;
-  y: number;
-  vx: number;
-  vy: number;
-  life: number;
-  color: string;
-  size: number;
 }
 
 // Leaderboard helpers
@@ -139,10 +118,8 @@ export default function Game() {
   const [rank, setRank] = useState<number | null>(null);
   
   // New features state
-  const [particles, setParticles] = useState<Particle[]>([]);
   const [floatingScores, setFloatingScores] = useState<{ x: number; y: number; value: number; life: number }[]>([]);
   const [undoCount, setUndoCount] = useState(0);
-  const [isFrozen, setIsFrozen] = useState(false);
   const [showShareButton, setShowShareButton] = useState(false);
 
   const gridRef = useRef(grid);
@@ -154,11 +131,6 @@ export default function Game() {
   const comboRef = useRef(0);
   const comboTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const undoHistoryRef = useRef<GameState[]>([]);
-  const isFrozenRef = useRef(false);
-  const frozenTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const pieceCountRef = useRef(0);
-  const particlesRef = useRef<Particle[]>([]);
-  const animationFrameRef = useRef<number | null>(null);
 
   // Touch state
   const touchStartRef = useRef<{ x: number; y: number; time: number } | null>(null);
@@ -169,57 +141,10 @@ export default function Game() {
   useEffect(() => { gameOverRef.current = gameOver; }, [gameOver]);
   useEffect(() => { isPausedRef.current = isPaused; }, [isPaused]);
   useEffect(() => { comboRef.current = combo; }, [combo]);
-  useEffect(() => { isFrozenRef.current = isFrozen; }, [isFrozen]);
 
   // Load leaderboard on mount
   useEffect(() => {
     setLeaderboard(loadLeaderboard());
-  }, []);
-
-  // Particle animation loop
-  useEffect(() => {
-    const animate = () => {
-      if (particlesRef.current.length > 0) {
-        particlesRef.current = particlesRef.current
-          .map(p => ({
-            ...p,
-            x: p.x + p.vx,
-            y: p.y + p.vy,
-            vy: p.vy + 0.3, // gravity
-            life: p.life - 1,
-            size: p.size * 0.97,
-          }))
-          .filter(p => p.life > 0);
-        setParticles([...particlesRef.current]);
-      }
-      animationFrameRef.current = requestAnimationFrame(animate);
-    };
-    animationFrameRef.current = requestAnimationFrame(animate);
-    return () => {
-      if (animationFrameRef.current) {
-        cancelAnimationFrame(animationFrameRef.current);
-      }
-    };
-  }, []);
-
-  // Spawn particles at position
-  const spawnParticles = useCallback((x: number, y: number, color: string) => {
-    const newParticles: Particle[] = [];
-    for (let i = 0; i < 12; i++) {
-      const angle = (Math.PI * 2 * i) / 12 + Math.random() * 0.5;
-      const speed = 2 + Math.random() * 3;
-      newParticles.push({
-        x: x * CELL_SIZE + CELL_SIZE / 2,
-        y: y * CELL_SIZE + CELL_SIZE / 2,
-        vx: Math.cos(angle) * speed,
-        vy: Math.sin(angle) * speed - 2,
-        life: 40 + Math.random() * 20,
-        color,
-        size: 4 + Math.random() * 3,
-      });
-    }
-    particlesRef.current = [...particlesRef.current, ...newParticles].slice(-50);
-    setParticles([...particlesRef.current]);
   }, []);
 
   // Calculate ghost position
@@ -309,63 +234,8 @@ export default function Game() {
       return;
     }
 
-    // Handle special blocks
-    if (piece.value === 0) {
-      // Bomb: clear 3x3 area
-      const cleared = applyBomb(newGrid, piece.x, piece.y);
-      const result = stabilize(newGrid);
-      setGrid(result.grid);
-      setScore(prev => prev + result.scoreGained + cleared.length * 5);
-      
-      // Spawn particles for bomb
-      spawnParticles(piece.x, piece.y, "#9F2F2D");
-      for (const pos of cleared) {
-        spawnParticles(pos.x, pos.y, "#F2B179");
-      }
-      
-      setShowShareButton(true);
-      setCurrentPiece(null);
-      setGameOver(true);
-      return;
-    }
-
-    if (piece.value === -1) {
-      // Ice: freeze gravity for 3 seconds
-      newGrid[piece.y][piece.x] = -1;
-      setGrid(newGrid);
-      setIsFrozen(true);
-      
-      if (frozenTimerRef.current) clearTimeout(frozenTimerRef.current);
-      frozenTimerRef.current = setTimeout(() => {
-        setIsFrozen(false);
-      }, 3000);
-      
-      // Continue with next piece
-      const newPiece = spawnPiece(nextValueRef.current);
-      if (!isValidMove(newGrid, newPiece.x, newPiece.y)) {
-        setGameOver(true);
-        setCurrentPiece(null);
-        setShowShareButton(true);
-        return;
-      }
-      setCurrentPiece(newPiece);
-      const newNext = generateRandomValue();
-      setNextValue(newNext);
-      nextValueRef.current = newNext;
-      pieceCountRef.current++;
-      return;
-    }
-
     const result = stabilize(newGrid);
     
-    // Spawn particles for merges
-    if (result.mergePositions.length > 0) {
-      const { text } = getBlockStyle(piece.value);
-      for (const pos of result.mergePositions.slice(0, 5)) {
-        spawnParticles(pos.x, pos.y, text);
-      }
-    }
-
     const mergeCount = result.scoreGained > 0 ? Math.max(1, Math.round(result.scoreGained / 10 / piece.value)) : 0;
     
     // Update combo if merges happened
@@ -402,16 +272,7 @@ export default function Game() {
       return;
     }
 
-    // Generate next piece (with chance for special)
-    pieceCountRef.current++;
-    let newNextValue: number;
-    if (pieceCountRef.current % 10 === 0) {
-      newNextValue = generateSpecialValue();
-    } else {
-      newNextValue = generateRandomValue();
-    }
-    
-    const newPiece = spawnPiece(newNextValue);
+    const newPiece = spawnPiece(nextValueRef.current);
     if (!isValidMove(result.grid, newPiece.x, newPiece.y)) {
       setGameOver(true);
       setCurrentPiece(null);
@@ -424,9 +285,10 @@ export default function Game() {
     }
 
     setCurrentPiece(newPiece);
-    setNextValue(newNextValue);
-    nextValueRef.current = newNextValue;
-  }, [resetComboTimer, score, saveStateForUndo, spawnParticles]);
+    const newNext = generateRandomValue();
+    setNextValue(newNext);
+    nextValueRef.current = newNext;
+  }, [resetComboTimer, score, saveStateForUndo]);
 
   const moveDown = useCallback(() => {
     const piece = currentPieceRef.current;
@@ -489,7 +351,6 @@ export default function Game() {
         const result = stabilize(newGrid);
         setGrid(result.grid);
         setScore(prev => prev + result.scoreGained);
-        spawnParticles(piece.x, piece.y, getBlockStyle(piece.value).text);
       }
     }
     setCurrentPiece(null);
@@ -500,7 +361,7 @@ export default function Game() {
     setLeaderboard(newLeaderboard);
     const playerRank = newLeaderboard.findIndex(e => e.score === score) + 1;
     if (playerRank > 0) setRank(playerRank);
-  }, [score, spawnParticles]);
+  }, [score]);
 
   // Share function
   const shareScore = useCallback(async () => {
@@ -621,14 +482,14 @@ export default function Game() {
 
   // Auto drop (with freeze support)
   useEffect(() => {
-    if (gameOver || isPaused || !currentPiece || isFrozen) return;
+    if (gameOver || isPaused || !currentPiece) return;
 
     const interval = setInterval(() => {
       moveDown();
     }, isFastDropRef.current ? 100 : 500);
 
     return () => clearInterval(interval);
-  }, [gameOver, isPaused, currentPiece, moveDown, isFrozen]);
+  }, [gameOver, isPaused, currentPiece, moveDown]);
 
   // Floating scores animation
   useEffect(() => {
@@ -649,11 +510,11 @@ export default function Game() {
     if (!ctx) return;
 
     // 背景 - 暖白
-    ctx.fillStyle = isFrozen ? "#E8F4FD" : "#F7F6F3";
+    ctx.fillStyle = "#F7F6F3";
     ctx.fillRect(0, 0, BOARD_WIDTH, BOARD_HEIGHT);
 
     // 網格線 - 極淡
-    ctx.strokeStyle = isFrozen ? "#B8D4E8" : "#EAEAEA";
+    ctx.strokeStyle = "#EAEAEA";
     ctx.lineWidth = 1;
     for (let x = 0; x <= COLS; x++) {
       ctx.beginPath();
@@ -668,12 +529,6 @@ export default function Game() {
       ctx.stroke();
     }
 
-    // 冰凍效果邊框
-    if (isFrozen) {
-      ctx.strokeStyle = "#1F6C9F";
-      ctx.lineWidth = 3;
-      ctx.strokeRect(2, 2, BOARD_WIDTH - 4, BOARD_HEIGHT - 4);
-    }
 
     // 方塊
     for (let y = 0; y < ROWS; y++) {
@@ -687,13 +542,7 @@ export default function Game() {
           const size = CELL_SIZE - 2;
           drawRoundRect(ctx, px, py, size, size, 3);
           
-          // Draw emoji or number
-          if (value === 0 || value === -1) {
-            ctx.font = "14px sans-serif";
-            ctx.textAlign = "center";
-            ctx.textBaseline = "middle";
-            ctx.fillText(getBlockDisplay(value), x * CELL_SIZE + CELL_SIZE / 2, y * CELL_SIZE + CELL_SIZE / 2);
-          } else {
+          {
             ctx.fillStyle = text;
             ctx.font = `600 ${value >= 1000 ? 13 : value >= 100 ? 16 : 19}px "SF Pro Display", "Geist Sans", system-ui, sans-serif`;
             ctx.textAlign = "center";
@@ -741,7 +590,7 @@ export default function Game() {
           ctx.font = "14px sans-serif";
           ctx.textAlign = "center";
           ctx.textBaseline = "middle";
-          ctx.fillText(getBlockDisplay(value), x * CELL_SIZE + CELL_SIZE / 2, y * CELL_SIZE + CELL_SIZE / 2);
+          ctx.fillText(String(value), x * CELL_SIZE + CELL_SIZE / 2, y * CELL_SIZE + CELL_SIZE / 2);
         } else {
           ctx.fillStyle = text;
           ctx.font = `600 ${value >= 1000 ? 13 : value >= 100 ? 16 : 19}px "SF Pro Display", "Geist Sans", system-ui, sans-serif`;
@@ -751,16 +600,6 @@ export default function Game() {
         }
       }
     }
-
-    // Particles
-    for (const p of particles) {
-      ctx.globalAlpha = p.life / 60;
-      ctx.fillStyle = p.color;
-      ctx.beginPath();
-      ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
-      ctx.fill();
-    }
-    ctx.globalAlpha = 1;
 
     // Floating scores
     for (const fs of floatingScores) {
@@ -780,15 +619,6 @@ export default function Game() {
       ctx.textAlign = "left";
       ctx.textBaseline = "top";
       ctx.fillText(`×${combo} COMBO`, 8, 8);
-    }
-
-    // Frozen indicator
-    if (isFrozen && !gameOver && !isPaused) {
-      ctx.fillStyle = "#1F6C9F";
-      ctx.font = `600 12px "SF Pro Display", "Geist Sans", system-ui, sans-serif`;
-      ctx.textAlign = "right";
-      ctx.textBaseline = "top";
-      ctx.fillText("❄️ 冰凍中", BOARD_WIDTH - 8, 8);
     }
 
     // Game Over overlay
@@ -830,7 +660,7 @@ export default function Game() {
       ctx.textBaseline = "middle";
       ctx.fillText("Paused", BOARD_WIDTH / 2, BOARD_HEIGHT / 2);
     }
-  }, [grid, currentPiece, gameOver, score, isPaused, combo, ghostY, calculateGhostY, rank, particles, floatingScores, isFrozen, showShareButton]);
+  }, [grid, currentPiece, gameOver, score, isPaused, combo, ghostY, calculateGhostY, rank, floatingScores, showShareButton]);
 
   // Restart
   const restart = useCallback(() => {
@@ -848,18 +678,14 @@ export default function Game() {
     setCombo(0);
     setRank(null);
     setShowLeaderboard(false);
-    setParticles([]);
     setFloatingScores([]);
     setUndoCount(0);
     setShowShareButton(false);
-    setIsFrozen(false);
 
     currentPieceRef.current = piece;
     nextValueRef.current = nextVal;
     comboRef.current = 0;
     undoHistoryRef.current = [];
-    pieceCountRef.current = 0;
-    particlesRef.current = [];
   }, []);
 
   // Initialize
@@ -893,8 +719,8 @@ export default function Game() {
             className="block"
             style={{
               borderRadius: "8px",
-              border: isFrozen ? "2px solid #1F6C9F" : "1px solid #EAEAEA",
-              background: isFrozen ? "#E8F4FD" : "#F7F6F3",
+              border: "1px solid #EAEAEA",
+              background: "#F7F6F3",
             }}
             tabIndex={0}
           />
@@ -967,15 +793,10 @@ export default function Game() {
                   border: "1px solid #EAEAEA",
                 }}
               >
-                {getBlockDisplay(nextValue)}
+                {nextValue}
               </div>
             </div>
-            {nextValue === 0 && (
-              <div className="text-[10px] text-[#9F2F2D] mt-2 text-center">💣 炸弹</div>
-            )}
-            {nextValue === -1 && (
-              <div className="text-[10px] text-[#1F6C9F] mt-2 text-center">❄️ 冰凍</div>
-            )}
+
           </div>
 
           {/* Leaderboard */}
