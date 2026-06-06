@@ -12,12 +12,62 @@ import {
   checkGameOver,
   type Grid,
   type Piece,
-  type Position,
 } from "@/lib/gameEngine";
 
 const CELL_SIZE = 30;
 const BOARD_WIDTH = COLS * CELL_SIZE;
 const BOARD_HEIGHT = ROWS * CELL_SIZE;
+
+// Difficulty settings
+type Difficulty = "easy" | "normal" | "hard";
+
+const DIFFICULTY_CONFIG: Record<Difficulty, {
+  dropInterval: number;
+  fastDropInterval: number;
+  valueWeights: { v2: number; v4: number; v8: number };
+  label: string;
+}> = {
+  easy: {
+    dropInterval: 700,
+    fastDropInterval: 150,
+    valueWeights: { v2: 0.75, v4: 0.2, v8: 0.05 },
+    label: "簡單",
+  },
+  normal: {
+    dropInterval: 500,
+    fastDropInterval: 100,
+    valueWeights: { v2: 0.6, v4: 0.3, v8: 0.1 },
+    label: "普通",
+  },
+  hard: {
+    dropInterval: 350,
+    fastDropInterval: 70,
+    valueWeights: { v2: 0.45, v4: 0.35, v8: 0.2 },
+    label: "困難",
+  },
+};
+
+// Level thresholds (experience needed for each level)
+const LEVEL_THRESHOLDS = [0, 100, 250, 500, 1000, 2000, 4000, 8000, 15000, 30000];
+
+function getLevel(exp: number): number {
+  for (let i = LEVEL_THRESHOLDS.length - 1; i >= 0; i--) {
+    if (exp >= LEVEL_THRESHOLDS[i]) return i + 1;
+  }
+  return 1;
+}
+
+function getExpForNextLevel(level: number): number {
+  return LEVEL_THRESHOLDS[level] || LEVEL_THRESHOLDS[LEVEL_THRESHOLDS.length - 1] * 2;
+}
+
+// Generate value based on difficulty weights
+function generateValueByDifficulty(weights: { v2: number; v4: number; v8: number }): number {
+  const rand = Math.random();
+  if (rand < weights.v2) return 2;
+  if (rand < weights.v2 + weights.v4) return 4;
+  return 8;
+}
 
 // Muted pastel palette for number blocks
 const VALUE_COLORS: Record<number, { bg: string; text: string }> = {
@@ -37,7 +87,6 @@ const VALUE_COLORS: Record<number, { bg: string; text: string }> = {
 function getBlockStyle(value: number) {
   return VALUE_COLORS[value] || { bg: "#111111", text: "#FFFFFF" };
 }
-
 
 function drawRoundRect(
   ctx: CanvasRenderingContext2D,
@@ -116,11 +165,17 @@ export default function Game() {
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[]>([]);
   const [showLeaderboard, setShowLeaderboard] = useState(false);
   const [rank, setRank] = useState<number | null>(null);
-  
-  // New features state
   const [floatingScores, setFloatingScores] = useState<{ x: number; y: number; value: number; life: number }[]>([]);
   const [undoCount, setUndoCount] = useState(0);
   const [showShareButton, setShowShareButton] = useState(false);
+  
+  // Level system
+  const [experience, setExperience] = useState(0);
+  const [level, setLevel] = useState(1);
+  
+  // Difficulty
+  const [difficulty, setDifficulty] = useState<Difficulty>("normal");
+  const [showDifficultySelect, setShowDifficultySelect] = useState(true);
 
   const gridRef = useRef(grid);
   const currentPieceRef = useRef(currentPiece);
@@ -131,6 +186,9 @@ export default function Game() {
   const comboRef = useRef(0);
   const comboTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const undoHistoryRef = useRef<GameState[]>([]);
+  const difficultyRef = useRef<Difficulty>("normal");
+  const experienceRef = useRef(0);
+  const levelRef = useRef(1);
 
   // Touch state
   const touchStartRef = useRef<{ x: number; y: number; time: number } | null>(null);
@@ -141,11 +199,19 @@ export default function Game() {
   useEffect(() => { gameOverRef.current = gameOver; }, [gameOver]);
   useEffect(() => { isPausedRef.current = isPaused; }, [isPaused]);
   useEffect(() => { comboRef.current = combo; }, [combo]);
+  useEffect(() => { difficultyRef.current = difficulty; }, [difficulty]);
+  useEffect(() => { experienceRef.current = experience; }, [experience]);
+  useEffect(() => { levelRef.current = level; }, [level]);
 
   // Load leaderboard on mount
   useEffect(() => {
     setLeaderboard(loadLeaderboard());
   }, []);
+
+  // Sync difficulty ref
+  useEffect(() => {
+    difficultyRef.current = difficulty;
+  }, [difficulty]);
 
   // Calculate ghost position
   const calculateGhostY = useCallback((piece: Piece | null, currentGrid: Grid): number => {
@@ -174,6 +240,16 @@ export default function Game() {
     }, 3000);
   }, []);
 
+  // Add experience
+  const addExperience = useCallback((points: number) => {
+    const newExp = experienceRef.current + points;
+    const newLevel = getLevel(newExp);
+    setExperience(newExp);
+    setLevel(newLevel);
+    experienceRef.current = newExp;
+    levelRef.current = newLevel;
+  }, []);
+
   // Save state for undo
   const saveStateForUndo = useCallback(() => {
     const state: GameState = {
@@ -199,7 +275,6 @@ export default function Game() {
     setNextValue(state.nextValue);
     setUndoCount(undoHistoryRef.current.length);
     
-    // Spawn piece from saved next value
     const piece = spawnPiece(state.nextValue);
     if (isValidMove(state.grid, piece.x, piece.y)) {
       setCurrentPiece(piece);
@@ -212,7 +287,6 @@ export default function Game() {
     const currentGrid = gridRef.current;
     if (!piece) return;
 
-    // Save state before locking
     saveStateForUndo();
 
     const newGrid = currentGrid.map(row => [...row]);
@@ -237,6 +311,13 @@ export default function Game() {
     const result = stabilize(newGrid);
     
     const mergeCount = result.scoreGained > 0 ? Math.max(1, Math.round(result.scoreGained / 10 / piece.value)) : 0;
+    
+    // Calculate experience gained
+    const baseExp = piece.value; // Base exp from piece value
+    const mergeBonusExp = mergeCount * 15; // Bonus for merges
+    const comboBonusExp = Math.min(comboRef.current, 5) * 5; // Combo bonus
+    const totalExp = baseExp + mergeBonusExp + comboBonusExp;
+    addExperience(totalExp);
     
     // Update combo if merges happened
     if (mergeCount > 0) {
@@ -285,10 +366,10 @@ export default function Game() {
     }
 
     setCurrentPiece(newPiece);
-    const newNext = generateRandomValue();
+    const newNext = generateValueByDifficulty(DIFFICULTY_CONFIG[difficultyRef.current].valueWeights);
     setNextValue(newNext);
     nextValueRef.current = newNext;
-  }, [resetComboTimer, score, saveStateForUndo]);
+  }, [resetComboTimer, score, saveStateForUndo, addExperience]);
 
   const moveDown = useCallback(() => {
     const piece = currentPieceRef.current;
@@ -339,7 +420,7 @@ export default function Game() {
     lockPiece();
   }, [lockPiece]);
 
-  // 结束游戏
+  // End game
   const endGame = useCallback(() => {
     if (gameOverRef.current) return;
     if (currentPieceRef.current) {
@@ -356,7 +437,6 @@ export default function Game() {
     setCurrentPiece(null);
     setGameOver(true);
     setShowShareButton(true);
-    // Add to leaderboard
     const newLeaderboard = addToLeaderboard(score);
     setLeaderboard(newLeaderboard);
     const playerRank = newLeaderboard.findIndex(e => e.score === score) + 1;
@@ -445,21 +525,17 @@ export default function Game() {
       const dy = touch.clientY - touchStartRef.current.y;
       const dt = Date.now() - touchStartRef.current.time;
 
-      // Tap (for pause)
       if (Math.abs(dx) < 10 && Math.abs(dy) < 10 && dt < 200) {
         setIsPaused(p => !p);
         touchStartRef.current = null;
         return;
       }
 
-      // Swipe
       if (Math.abs(dx) > 30 || Math.abs(dy) > 30) {
         if (Math.abs(dx) > Math.abs(dy)) {
-          // Horizontal
           if (dx > 0) moveRight();
           else moveLeft();
         } else {
-          // Vertical
           if (dy > 30) {
             isFastDropRef.current = true;
             moveDown();
@@ -480,13 +556,14 @@ export default function Game() {
     };
   }, [moveLeft, moveRight, moveDown, hardDrop, isPaused]);
 
-  // Auto drop (with freeze support)
+  // Auto drop
   useEffect(() => {
     if (gameOver || isPaused || !currentPiece) return;
 
+    const config = DIFFICULTY_CONFIG[difficultyRef.current];
     const interval = setInterval(() => {
       moveDown();
-    }, isFastDropRef.current ? 100 : 500);
+    }, isFastDropRef.current ? config.fastDropInterval : config.dropInterval);
 
     return () => clearInterval(interval);
   }, [gameOver, isPaused, currentPiece, moveDown]);
@@ -502,18 +579,16 @@ export default function Game() {
     return () => clearInterval(interval);
   }, [floatingScores.length]);
 
-  // Canvas 渲染
+  // Canvas rendering
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
     const ctx = canvas.getContext("2d");
     if (!ctx) return;
 
-    // 背景 - 暖白
     ctx.fillStyle = "#F7F6F3";
     ctx.fillRect(0, 0, BOARD_WIDTH, BOARD_HEIGHT);
 
-    // 網格線 - 極淡
     ctx.strokeStyle = "#EAEAEA";
     ctx.lineWidth = 1;
     for (let x = 0; x <= COLS; x++) {
@@ -529,8 +604,6 @@ export default function Game() {
       ctx.stroke();
     }
 
-
-    // 方塊
     for (let y = 0; y < ROWS; y++) {
       for (let x = 0; x < COLS; x++) {
         const value = grid[y][x];
@@ -541,57 +614,6 @@ export default function Game() {
           const py = y * CELL_SIZE + 1;
           const size = CELL_SIZE - 2;
           drawRoundRect(ctx, px, py, size, size, 3);
-          
-          {
-            ctx.fillStyle = text;
-            ctx.font = `600 ${value >= 1000 ? 13 : value >= 100 ? 16 : 19}px "SF Pro Display", "Geist Sans", system-ui, sans-serif`;
-            ctx.textAlign = "center";
-            ctx.textBaseline = "middle";
-            ctx.fillText(String(value), x * CELL_SIZE + CELL_SIZE / 2, y * CELL_SIZE + CELL_SIZE / 2);
-          }
-        }
-      }
-    }
-
-    // Ghost piece (projection)
-    if (currentPiece && !gameOver && !isPaused && currentPiece.value > 0) {
-      const { x, value } = currentPiece;
-      const ghostYPos = calculateGhostY(currentPiece, grid);
-      if (ghostYPos !== currentPiece.y && ghostYPos >= 0 && ghostYPos < ROWS) {
-        const { bg, text } = getBlockStyle(value);
-        ctx.globalAlpha = 0.2;
-        ctx.fillStyle = bg;
-        const px = x * CELL_SIZE + 1;
-        const py = ghostYPos * CELL_SIZE + 1;
-        const size = CELL_SIZE - 2;
-        drawRoundRect(ctx, px, py, size, size, 3);
-        ctx.globalAlpha = 0.4;
-        ctx.strokeStyle = text;
-        ctx.lineWidth = 1;
-        ctx.beginPath();
-        ctx.arc(x * CELL_SIZE + CELL_SIZE / 2, ghostYPos * CELL_SIZE + CELL_SIZE / 2, size / 2 - 2, 0, Math.PI * 2);
-        ctx.stroke();
-        ctx.globalAlpha = 1;
-      }
-    }
-
-    // Current falling piece
-    if (currentPiece) {
-      const { x, y, value } = currentPiece;
-      if (y >= 0 && y < ROWS) {
-        const { bg, text } = getBlockStyle(value);
-        ctx.fillStyle = bg;
-        const px = x * CELL_SIZE + 1;
-        const py = y * CELL_SIZE + 1;
-        const size = CELL_SIZE - 2;
-        drawRoundRect(ctx, px, py, size, size, 3);
-        
-        if (value === 0 || value === -1) {
-          ctx.font = "14px sans-serif";
-          ctx.textAlign = "center";
-          ctx.textBaseline = "middle";
-          ctx.fillText(String(value), x * CELL_SIZE + CELL_SIZE / 2, y * CELL_SIZE + CELL_SIZE / 2);
-        } else {
           ctx.fillStyle = text;
           ctx.font = `600 ${value >= 1000 ? 13 : value >= 100 ? 16 : 19}px "SF Pro Display", "Geist Sans", system-ui, sans-serif`;
           ctx.textAlign = "center";
@@ -601,7 +623,41 @@ export default function Game() {
       }
     }
 
-    // Floating scores
+    if (currentPiece && !gameOver && !isPaused) {
+      const { x, y, value } = currentPiece;
+      if (y >= 0 && y < ROWS) {
+        const ghostYPos = calculateGhostY(currentPiece, grid);
+        if (ghostYPos !== y && ghostYPos >= 0 && ghostYPos < ROWS) {
+          const { bg, text } = getBlockStyle(value);
+          ctx.globalAlpha = 0.2;
+          ctx.fillStyle = bg;
+          const px = x * CELL_SIZE + 1;
+          const py = ghostYPos * CELL_SIZE + 1;
+          const size = CELL_SIZE - 2;
+          drawRoundRect(ctx, px, py, size, size, 3);
+          ctx.globalAlpha = 0.4;
+          ctx.strokeStyle = text;
+          ctx.lineWidth = 1;
+          ctx.beginPath();
+          ctx.arc(x * CELL_SIZE + CELL_SIZE / 2, ghostYPos * CELL_SIZE + CELL_SIZE / 2, size / 2 - 2, 0, Math.PI * 2);
+          ctx.stroke();
+          ctx.globalAlpha = 1;
+        }
+
+        const { bg, text } = getBlockStyle(value);
+        ctx.fillStyle = bg;
+        const px = x * CELL_SIZE + 1;
+        const py = y * CELL_SIZE + 1;
+        const size = CELL_SIZE - 2;
+        drawRoundRect(ctx, px, py, size, size, 3);
+        ctx.fillStyle = text;
+        ctx.font = `600 ${value >= 1000 ? 13 : value >= 100 ? 16 : 19}px "SF Pro Display", "Geist Sans", system-ui, sans-serif`;
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText(String(value), x * CELL_SIZE + CELL_SIZE / 2, y * CELL_SIZE + CELL_SIZE / 2);
+      }
+    }
+
     for (const fs of floatingScores) {
       ctx.globalAlpha = fs.life / 60;
       ctx.fillStyle = "#9F2F2D";
@@ -612,7 +668,6 @@ export default function Game() {
     }
     ctx.globalAlpha = 1;
 
-    // Combo display on canvas
     if (combo > 0 && !gameOver && !isPaused) {
       ctx.fillStyle = "#9F2F2D";
       ctx.font = `700 20px "SF Pro Display", "Geist Sans", system-ui, sans-serif`;
@@ -621,7 +676,6 @@ export default function Game() {
       ctx.fillText(`×${combo} COMBO`, 8, 8);
     }
 
-    // Game Over overlay
     if (gameOver) {
       ctx.fillStyle = "rgba(247, 246, 243, 0.85)";
       ctx.fillRect(0, 0, BOARD_WIDTH, BOARD_HEIGHT);
@@ -649,7 +703,6 @@ export default function Game() {
       }
     }
 
-    // Pause overlay
     if (isPaused && !gameOver) {
       ctx.fillStyle = "rgba(247, 246, 243, 0.85)";
       ctx.fillRect(0, 0, BOARD_WIDTH, BOARD_HEIGHT);
@@ -662,11 +715,10 @@ export default function Game() {
     }
   }, [grid, currentPiece, gameOver, score, isPaused, combo, ghostY, calculateGhostY, rank, floatingScores, showShareButton]);
 
-  // Restart
   const restart = useCallback(() => {
     const newGrid = createEmptyGrid();
-    const firstValue = generateRandomValue();
-    const nextVal = generateRandomValue();
+    const firstValue = generateValueByDifficulty(DIFFICULTY_CONFIG[difficulty].valueWeights);
+    const nextVal = generateValueByDifficulty(DIFFICULTY_CONFIG[difficulty].valueWeights);
     const piece = spawnPiece(firstValue);
 
     setGrid(newGrid);
@@ -681,182 +733,168 @@ export default function Game() {
     setFloatingScores([]);
     setUndoCount(0);
     setShowShareButton(false);
+    setExperience(0);
+    setLevel(1);
 
     currentPieceRef.current = piece;
     nextValueRef.current = nextVal;
     comboRef.current = 0;
     undoHistoryRef.current = [];
-  }, []);
+    experienceRef.current = 0;
+    levelRef.current = 1;
+    setShowDifficultySelect(true);
+  }, [difficulty]);
 
-  // Initialize
   useEffect(() => {
     restart();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  const startGame = useCallback((selectedDifficulty: Difficulty) => {
+    setDifficulty(selectedDifficulty);
+    difficultyRef.current = selectedDifficulty;
+    setShowDifficultySelect(false);
+    restart();
+  }, [restart]);
+
+  const currentLevelExp = LEVEL_THRESHOLDS[level - 1] || 0;
+  const nextLevelExp = getExpForNextLevel(level);
+  const expProgress = level >= LEVEL_THRESHOLDS.length 
+    ? 100 
+    : ((experience - currentLevelExp) / (nextLevelExp - currentLevelExp)) * 100;
 
   return (
     <div
       className="flex flex-col items-center gap-8 select-none"
       style={{ fontFamily: '"SF Pro Display", "Geist Sans", system-ui, sans-serif' }}
     >
-      {/* Header */}
+      {showDifficultySelect && (
+        <div className="fixed inset-0 flex items-center justify-center z-50" style={{ background: "rgba(0,0,0,0.5)" }}>
+          <div className="p-8 rounded-2xl" style={{ background: "#FFFFFF", minWidth: "280px" }}>
+            <h2 className="text-[20px] font-semibold text-[#111111] mb-6 text-center">選擇難度</h2>
+            <div className="flex flex-col gap-3">
+              {(["easy", "normal", "hard"] as Difficulty[]).map((d) => (
+                <button
+                  key={d}
+                  onClick={() => startGame(d)}
+                  className="py-3 px-6 text-[14px] font-medium rounded-lg transition-all duration-200"
+                  style={{
+                    background: d === "easy" ? "#EDF3EC" : d === "normal" ? "#F7F6F3" : "#FDEBEC",
+                    color: d === "easy" ? "#346538" : d === "normal" ? "#111111" : "#9F2F2D",
+                    border: "1px solid #EAEAEA",
+                    cursor: "pointer",
+                  }}
+                  onMouseEnter={(e) => { e.currentTarget.style.transform = "scale(0.98)"; }}
+                  onMouseLeave={(e) => { e.currentTarget.style.transform = "scale(1)"; }}
+                >
+                  {DIFFICULTY_CONFIG[d].label}模式
+                  <span className="block text-[11px] mt-1 opacity-70">
+                    {d === "easy" && "較慢速度，適合新手"}
+                    {d === "normal" && "標準速度，平衡體驗"}
+                    {d === "hard" && "較快速度，挑戰極限"}
+                  </span>
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+
       <div className="flex flex-col items-center gap-1">
-        <h1 className="text-[22px] font-semibold tracking-[-0.02em] text-[#111111]">
-          数字消除方块
-        </h1>
-        <p className="text-[12px] text-[#787774] tracking-wide">
-          相邻三个相同数字自动合并
-        </p>
+        <h1 className="text-[22px] font-semibold tracking-[-0.02em] text-[#111111]">数字消除方块</h1>
+        <p className="text-[12px] text-[#787774] tracking-wide">相邻三个相同数字自动合并</p>
       </div>
 
       <div className="flex gap-8 items-start">
-        {/* Canvas */}
         <div className="relative">
           <canvas
             ref={canvasRef}
             width={BOARD_WIDTH}
             height={BOARD_HEIGHT}
             className="block"
-            style={{
-              borderRadius: "8px",
-              border: "1px solid #EAEAEA",
-              background: "#F7F6F3",
-            }}
+            style={{ borderRadius: "8px", border: "1px solid #EAEAEA", background: "#F7F6F3" }}
             tabIndex={0}
           />
         </div>
 
-        {/* Sidebar */}
         <div className="flex flex-col gap-4 min-w-[160px]">
-          {/* Score */}
-          <div
-            className="p-5"
-            style={{
-              background: "#FFFFFF",
-              border: "1px solid #EAEAEA",
-              borderRadius: "8px",
-            }}
-          >
-            <div className="text-[10px] uppercase tracking-[0.08em] text-[#787774] mb-2 font-medium">
-              得分
+          {/* Level */}
+          <div className="p-5" style={{ background: "#FFFFFF", border: "1px solid #EAEAEA", borderRadius: "8px" }}>
+            <div className="flex justify-between items-center mb-2">
+              <div className="text-[10px] uppercase tracking-[0.08em] text-[#787774] font-medium">等級</div>
+              <div className="text-[18px] font-bold text-[#1F6C9F]">Lv.{level}</div>
             </div>
-            <div className="text-[28px] font-semibold tracking-[-0.03em] text-[#111111] tabular-nums">
-              {score}
-            </div>
-            {/* Combo indicator */}
-            {combo > 0 && !gameOver && (
-              <div 
-                className="mt-2 text-[11px] font-semibold px-2 py-1 inline-block"
+            <div className="h-[6px] rounded-full overflow-hidden" style={{ background: "#EAEAEA" }}>
+              <div
+                className="h-full rounded-full transition-all duration-300"
                 style={{
-                  background: "#FDEBEC",
-                  color: "#9F2F2D",
-                  borderRadius: "4px",
+                  width: `${Math.min(expProgress, 100)}%`,
+                  background: "linear-gradient(90deg, #1F6C9F, #346538)",
                 }}
-              >
+              />
+            </div>
+            <div className="text-[10px] text-[#787774] mt-1 text-right">{experience} / {nextLevelExp} EXP</div>
+          </div>
+
+          {/* Score */}
+          <div className="p-5" style={{ background: "#FFFFFF", border: "1px solid #EAEAEA", borderRadius: "8px" }}>
+            <div className="text-[10px] uppercase tracking-[0.08em] text-[#787774] mb-2 font-medium">得分</div>
+            <div className="text-[28px] font-semibold tracking-[-0.03em] text-[#111111] tabular-nums">{score}</div>
+            {combo > 0 && !gameOver && (
+              <div className="mt-2 text-[11px] font-semibold px-2 py-1 inline-block"
+                style={{ background: "#FDEBEC", color: "#9F2F2D", borderRadius: "4px" }}>
                 🔥 连击 ×{combo}
               </div>
             )}
-            {/* Undo indicator */}
             {undoCount > 0 && !gameOver && (
-              <div 
-                className="mt-1 text-[10px] px-2 py-1 inline-block"
-                style={{
-                  background: "#E1F3FE",
-                  color: "#1F6C9F",
-                  borderRadius: "4px",
-                }}
-              >
+              <div className="mt-1 text-[10px] px-2 py-1 inline-block"
+                style={{ background: "#E1F3FE", color: "#1F6C9F", borderRadius: "4px" }}>
                 ↩️ 可撤销 {undoCount}/3
               </div>
             )}
           </div>
 
-          {/* Next preview */}
-          <div
-            className="p-5"
-            style={{
-              background: "#FFFFFF",
-              border: "1px solid #EAEAEA",
-              borderRadius: "8px",
-            }}
-          >
-            <div className="text-[10px] uppercase tracking-[0.08em] text-[#787774] mb-3 font-medium">
-              下一个
-            </div>
+          {/* Next */}
+          <div className="p-5" style={{ background: "#FFFFFF", border: "1px solid #EAEAEA", borderRadius: "8px" }}>
+            <div className="text-[10px] uppercase tracking-[0.08em] text-[#787774] mb-3 font-medium">下一个</div>
             <div className="flex justify-center">
-              <div
-                className="w-[44px] h-[44px] flex items-center justify-center font-semibold text-[15px]"
-                style={{
-                  background: getBlockStyle(nextValue).bg,
-                  color: getBlockStyle(nextValue).text,
-                  borderRadius: "6px",
-                  border: "1px solid #EAEAEA",
-                }}
-              >
+              <div className="w-[44px] h-[44px] flex items-center justify-center font-semibold text-[15px]"
+                style={{ background: getBlockStyle(nextValue).bg, color: getBlockStyle(nextValue).text, borderRadius: "6px", border: "1px solid #EAEAEA" }}>
                 {nextValue}
               </div>
             </div>
-
           </div>
 
           {/* Leaderboard */}
-          <div
-            className="p-5 cursor-pointer transition-all duration-200"
-            style={{
-              background: showLeaderboard ? "#F7F6F3" : "#FFFFFF",
-              border: "1px solid #EAEAEA",
-              borderRadius: "8px",
-            }}
-            onClick={() => setShowLeaderboard(!showLeaderboard)}
-          >
+          <div className="p-5 cursor-pointer transition-all duration-200"
+            style={{ background: showLeaderboard ? "#F7F6F3" : "#FFFFFF", border: "1px solid #EAEAEA", borderRadius: "8px" }}
+            onClick={() => setShowLeaderboard(!showLeaderboard)}>
             <div className="flex justify-between items-center mb-2">
-              <div className="text-[10px] uppercase tracking-[0.08em] text-[#787774] font-medium">
-                排行榜
-              </div>
-              <div className="text-[10px] text-[#787774]">
-                {showLeaderboard ? "▲" : "▼"}
-              </div>
+              <div className="text-[10px] uppercase tracking-[0.08em] text-[#787774] font-medium">排行榜</div>
+              <div className="text-[10px] text-[#787774]">{showLeaderboard ? "▲" : "▼"}</div>
             </div>
             {showLeaderboard ? (
               <div className="flex flex-col gap-1">
                 {leaderboard.length === 0 ? (
-                  <div className="text-[11px] text-[#AAA] py-2 text-center">
-                    暂无记录
-                  </div>
+                  <div className="text-[11px] text-[#AAA] py-2 text-center">暂无记录</div>
                 ) : (
                   leaderboard.slice(0, 5).map((entry, i) => (
-                    <div 
-                      key={i} 
-                      className="flex justify-between text-[11px] py-1"
-                      style={{ color: i === 0 ? "#956400" : i === 1 ? "#787774" : i === 2 ? "#8B3A1A" : "#AAA" }}
-                    >
-                      <span className="font-medium">
-                        {i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : `${i + 1}.`}
-                      </span>
+                    <div key={i} className="flex justify-between text-[11px] py-1"
+                      style={{ color: i === 0 ? "#956400" : i === 1 ? "#787774" : i === 2 ? "#8B3A1A" : "#AAA" }}>
+                      <span className="font-medium">{i === 0 ? "🥇" : i === 1 ? "🥈" : i === 2 ? "🥉" : `${i + 1}.`}</span>
                       <span className="tabular-nums">{entry.score}</span>
                     </div>
                   ))
                 )}
               </div>
             ) : (
-              <div className="text-[11px] text-[#787774]">
-                {leaderboard.length > 0 ? `最高: ${leaderboard[0].score}` : "点击展开"}
-              </div>
+              <div className="text-[11px] text-[#787774]">{leaderboard.length > 0 ? `最高: ${leaderboard[0].score}` : "点击展开"}</div>
             )}
           </div>
 
           {/* Controls */}
-          <div
-            className="px-5 py-4"
-            style={{
-              background: "#FFFFFF",
-              border: "1px solid #EAEAEA",
-              borderRadius: "8px",
-            }}
-          >
-            <div className="text-[10px] uppercase tracking-[0.08em] text-[#787774] mb-3 font-medium">
-              操作
-            </div>
+          <div className="px-5 py-4" style={{ background: "#FFFFFF", border: "1px solid #EAEAEA", borderRadius: "8px" }}>
+            <div className="text-[10px] uppercase tracking-[0.08em] text-[#787774] mb-3 font-medium">操作</div>
             <div className="flex flex-col gap-2">
               {[
                 ["← →", "左右移动"],
@@ -866,16 +904,8 @@ export default function Game() {
                 ["Z", "撤销"],
               ].map(([key, desc]) => (
                 <div key={key} className="flex items-center gap-3">
-                  <span
-                    className="inline-flex items-center justify-center min-w-[28px] h-[22px] px-1.5 text-[10px] font-medium"
-                    style={{
-                      background: "#F7F6F3",
-                      border: "1px solid #EAEAEA",
-                      borderRadius: "4px",
-                      color: "#555",
-                      fontFamily: '"SF Mono", "Geist Mono", monospace',
-                    }}
-                  >
+                  <span className="inline-flex items-center justify-center min-w-[28px] h-[22px] px-1.5 text-[10px] font-medium"
+                    style={{ background: "#F7F6F3", border: "1px solid #EAEAEA", borderRadius: "4px", color: "#555", fontFamily: '"SF Mono", "Geist Mono", monospace' }}>
                     {key}
                   </span>
                   <span className="text-[12px] text-[#787774]">{desc}</span>
@@ -886,107 +916,26 @@ export default function Game() {
 
           {/* Buttons */}
           <div className="flex flex-col gap-2">
-            {/* Share button (only shown after game over) */}
             {showShareButton && (
-              <button
-                onClick={shareScore}
-                className="w-full py-2.5 px-4 text-[13px] font-medium transition-all duration-200 ease-[cubic-bezier(0.16,1,0.3,1)]"
-                style={{
-                  background: "#1F6C9F",
-                  color: "#FFFFFF",
-                  borderRadius: "6px",
-                  border: "none",
-                  cursor: "pointer",
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.background = "#155A8A";
-                  e.currentTarget.style.transform = "scale(0.98)";
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.background = "#1F6C9F";
-                  e.currentTarget.style.transform = "scale(1)";
-                }}
-              >
+              <button onClick={shareScore}
+                className="w-full py-2.5 px-4 text-[13px] font-medium transition-all duration-200"
+                style={{ background: "#1F6C9F", color: "#FFFFFF", borderRadius: "6px", border: "none", cursor: "pointer" }}>
                 📤 分享成绩
               </button>
             )}
-
-            {/* End game */}
-            <button
-              onClick={endGame}
-              disabled={gameOver}
-              className="w-full py-2.5 px-4 text-[13px] font-medium transition-all duration-200 ease-[cubic-bezier(0.16,1,0.3,1)]"
-              style={{
-                background: gameOver ? "#EAEAEA" : "#111111",
-                color: gameOver ? "#AAA" : "#FFFFFF",
-                borderRadius: "6px",
-                border: "none",
-                cursor: gameOver ? "default" : "pointer",
-              }}
-              onMouseEnter={(e) => {
-                if (!gameOver) {
-                  e.currentTarget.style.background = "#333333";
-                  e.currentTarget.style.transform = "scale(0.98)";
-                }
-              }}
-              onMouseLeave={(e) => {
-                if (!gameOver) {
-                  e.currentTarget.style.background = "#111111";
-                  e.currentTarget.style.transform = "scale(1)";
-                }
-              }}
-            >
+            <button onClick={endGame} disabled={gameOver}
+              className="w-full py-2.5 px-4 text-[13px] font-medium transition-all duration-200"
+              style={{ background: gameOver ? "#EAEAEA" : "#111111", color: gameOver ? "#AAA" : "#FFFFFF", borderRadius: "6px", border: "none", cursor: gameOver ? "default" : "pointer" }}>
               结束游戏
             </button>
-
-            {/* Restart */}
-            <button
-              onClick={restart}
-              className="w-full py-2.5 px-4 text-[13px] font-medium transition-all duration-200 ease-[cubic-bezier(0.16,1,0.3,1)]"
-              style={{
-                background: "#F7F6F3",
-                color: "#111111",
-                borderRadius: "6px",
-                border: "1px solid #EAEAEA",
-                cursor: "pointer",
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.background = "#EAEAEA";
-                e.currentTarget.style.transform = "scale(0.98)";
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.background = "#F7F6F3";
-                e.currentTarget.style.transform = "scale(1)";
-              }}
-            >
+            <button onClick={restart}
+              className="w-full py-2.5 px-4 text-[13px] font-medium transition-all duration-200"
+              style={{ background: "#F7F6F3", color: "#111111", borderRadius: "6px", border: "1px solid #EAEAEA", cursor: "pointer" }}>
               重新开始
             </button>
-
-            {/* Pause/Resume */}
-            <button
-              onClick={() => setIsPaused(p => !p)}
-              disabled={gameOver}
-              className="w-full py-2.5 px-4 text-[13px] font-medium transition-all duration-200 ease-[cubic-bezier(0.16,1,0.3,1)]"
-              style={{
-                background: gameOver ? "#F7F6F3" : "#FFFFFF",
-                color: gameOver ? "#AAA" : "#111111",
-                borderRadius: "6px",
-                border: "1px solid #EAEAEA",
-                cursor: gameOver ? "default" : "pointer",
-              }}
-              onMouseEnter={(e) => {
-                if (!gameOver) {
-                  e.currentTarget.style.background = "#F7F6F3";
-                  e.currentTarget.style.transform = "scale(0.98)";
-                }
-              }}
-              onMouseLeave={(e) => {
-                if (!gameOver) {
-                  e.currentTarget.style.background = "#FFFFFF";
-                  e.currentTarget.style.transform = "scale(1)";
-                }
-              }}
-            >
+            <button onClick={() => setIsPaused(p => !p)} disabled={gameOver}
+              className="w-full py-2.5 px-4 text-[13px] font-medium transition-all duration-200"
+              style={{ background: gameOver ? "#F7F6F3" : "#FFFFFF", color: gameOver ? "#AAA" : "#111111", borderRadius: "6px", border: "1px solid #EAEAEA", cursor: gameOver ? "default" : "pointer" }}>
               {isPaused ? "继续" : "暂停"}
             </button>
           </div>
