@@ -18,34 +18,7 @@ const CELL_SIZE = 30;
 const BOARD_WIDTH = COLS * CELL_SIZE;
 const BOARD_HEIGHT = ROWS * CELL_SIZE;
 
-// Difficulty settings
-type Difficulty = "easy" | "normal" | "hard";
 
-const DIFFICULTY_CONFIG: Record<Difficulty, {
-  dropInterval: number;
-  fastDropInterval: number;
-  valueWeights: { v2: number; v4: number; v8: number };
-  label: string;
-}> = {
-  easy: {
-    dropInterval: 700,
-    fastDropInterval: 150,
-    valueWeights: { v2: 0.75, v4: 0.2, v8: 0.05 },
-    label: "簡單",
-  },
-  normal: {
-    dropInterval: 500,
-    fastDropInterval: 100,
-    valueWeights: { v2: 0.6, v4: 0.3, v8: 0.1 },
-    label: "普通",
-  },
-  hard: {
-    dropInterval: 350,
-    fastDropInterval: 70,
-    valueWeights: { v2: 0.45, v4: 0.35, v8: 0.2 },
-    label: "困難",
-  },
-};
 
 // Level thresholds (experience needed for each level)
 const LEVEL_THRESHOLDS = [0, 100, 250, 500, 1000, 2000, 4000, 8000, 15000, 30000];
@@ -61,13 +34,7 @@ function getExpForNextLevel(level: number): number {
   return LEVEL_THRESHOLDS[level] || LEVEL_THRESHOLDS[LEVEL_THRESHOLDS.length - 1] * 2;
 }
 
-// Generate value based on difficulty weights
-function generateValueByDifficulty(weights: { v2: number; v4: number; v8: number }): number {
-  const rand = Math.random();
-  if (rand < weights.v2) return 2;
-  if (rand < weights.v2 + weights.v4) return 4;
-  return 8;
-}
+
 
 // Muted pastel palette for number blocks
 const VALUE_COLORS: Record<number, { bg: string; text: string }> = {
@@ -172,10 +139,6 @@ export default function Game() {
   // Level system
   const [experience, setExperience] = useState(0);
   const [level, setLevel] = useState(1);
-  
-  // Difficulty
-  const [difficulty, setDifficulty] = useState<Difficulty>("normal");
-  const [showDifficultySelect, setShowDifficultySelect] = useState(true);
 
   const gridRef = useRef(grid);
   const currentPieceRef = useRef(currentPiece);
@@ -186,7 +149,6 @@ export default function Game() {
   const comboRef = useRef(0);
   const comboTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const undoHistoryRef = useRef<GameState[]>([]);
-  const difficultyRef = useRef<Difficulty>("normal");
   const experienceRef = useRef(0);
   const levelRef = useRef(1);
 
@@ -199,7 +161,6 @@ export default function Game() {
   useEffect(() => { gameOverRef.current = gameOver; }, [gameOver]);
   useEffect(() => { isPausedRef.current = isPaused; }, [isPaused]);
   useEffect(() => { comboRef.current = combo; }, [combo]);
-  useEffect(() => { difficultyRef.current = difficulty; }, [difficulty]);
   useEffect(() => { experienceRef.current = experience; }, [experience]);
   useEffect(() => { levelRef.current = level; }, [level]);
 
@@ -207,11 +168,6 @@ export default function Game() {
   useEffect(() => {
     setLeaderboard(loadLeaderboard());
   }, []);
-
-  // Sync difficulty ref
-  useEffect(() => {
-    difficultyRef.current = difficulty;
-  }, [difficulty]);
 
   // Calculate ghost position
   const calculateGhostY = useCallback((piece: Piece | null, currentGrid: Grid): number => {
@@ -366,7 +322,7 @@ export default function Game() {
     }
 
     setCurrentPiece(newPiece);
-    const newNext = generateValueByDifficulty(DIFFICULTY_CONFIG[difficultyRef.current].valueWeights);
+    const newNext = generateRandomValue();
     setNextValue(newNext);
     nextValueRef.current = newNext;
   }, [resetComboTimer, score, saveStateForUndo, addExperience]);
@@ -560,10 +516,11 @@ export default function Game() {
   useEffect(() => {
     if (gameOver || isPaused || !currentPiece) return;
 
-    const config = DIFFICULTY_CONFIG[difficultyRef.current];
+    const dropInterval = 500;
+    const fastDropInterval = 100;
     const interval = setInterval(() => {
       moveDown();
-    }, isFastDropRef.current ? config.fastDropInterval : config.dropInterval);
+    }, isFastDropRef.current ? fastDropInterval : dropInterval);
 
     return () => clearInterval(interval);
   }, [gameOver, isPaused, currentPiece, moveDown]);
@@ -717,8 +674,8 @@ export default function Game() {
 
   const restart = useCallback(() => {
     const newGrid = createEmptyGrid();
-    const firstValue = generateValueByDifficulty(DIFFICULTY_CONFIG[difficulty].valueWeights);
-    const nextVal = generateValueByDifficulty(DIFFICULTY_CONFIG[difficulty].valueWeights);
+    const firstValue = generateRandomValue();
+    const nextVal = generateRandomValue();
     const piece = spawnPiece(firstValue);
 
     setGrid(newGrid);
@@ -742,18 +699,15 @@ export default function Game() {
     undoHistoryRef.current = [];
     experienceRef.current = 0;
     levelRef.current = 1;
-    setShowDifficultySelect(true);
-  }, [difficulty]);
+    
+  }, []);
 
   useEffect(() => {
     restart();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const startGame = useCallback((selectedDifficulty: Difficulty) => {
-    setDifficulty(selectedDifficulty);
-    difficultyRef.current = selectedDifficulty;
-    setShowDifficultySelect(false);
+  const startGame = useCallback(() => {
     restart();
   }, [restart]);
 
@@ -768,37 +722,6 @@ export default function Game() {
       className="flex flex-col items-center gap-8 select-none"
       style={{ fontFamily: '"SF Pro Display", "Geist Sans", system-ui, sans-serif' }}
     >
-      {showDifficultySelect && (
-        <div className="fixed inset-0 flex items-center justify-center z-50" style={{ background: "rgba(0,0,0,0.5)" }}>
-          <div className="p-8 rounded-2xl" style={{ background: "#FFFFFF", minWidth: "280px" }}>
-            <h2 className="text-[20px] font-semibold text-[#111111] mb-6 text-center">選擇難度</h2>
-            <div className="flex flex-col gap-3">
-              {(["easy", "normal", "hard"] as Difficulty[]).map((d) => (
-                <button
-                  key={d}
-                  onClick={() => startGame(d)}
-                  className="py-3 px-6 text-[14px] font-medium rounded-lg transition-all duration-200"
-                  style={{
-                    background: d === "easy" ? "#EDF3EC" : d === "normal" ? "#F7F6F3" : "#FDEBEC",
-                    color: d === "easy" ? "#346538" : d === "normal" ? "#111111" : "#9F2F2D",
-                    border: "1px solid #EAEAEA",
-                    cursor: "pointer",
-                  }}
-                  onMouseEnter={(e) => { e.currentTarget.style.transform = "scale(0.98)"; }}
-                  onMouseLeave={(e) => { e.currentTarget.style.transform = "scale(1)"; }}
-                >
-                  {DIFFICULTY_CONFIG[d].label}模式
-                  <span className="block text-[11px] mt-1 opacity-70">
-                    {d === "easy" && "較慢速度，適合新手"}
-                    {d === "normal" && "標準速度，平衡體驗"}
-                    {d === "hard" && "較快速度，挑戰極限"}
-                  </span>
-                </button>
-              ))}
-            </div>
-          </div>
-        </div>
-      )}
 
       <div className="flex flex-col items-center gap-1">
         <h1 className="text-[22px] font-semibold tracking-[-0.02em] text-[#111111]">数字消除方块</h1>
