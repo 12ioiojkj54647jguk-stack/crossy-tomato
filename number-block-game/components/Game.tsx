@@ -23,6 +23,111 @@ const BOARD_HEIGHT = ROWS * CELL_SIZE;
 // Level thresholds (experience needed for each level)
 const LEVEL_THRESHOLDS = [0, 100, 250, 500, 1000, 2000, 4000, 8000, 15000, 30000];
 
+// Achievement definitions
+interface Achievement {
+  id: string;
+  name: string;
+  description: string;
+  icon: string;
+  condition: (stats: GameStats) => boolean;
+}
+
+const ACHIEVEMENTS: Achievement[] = [
+  {
+    id: "first_merge",
+    name: "初次合并",
+    description: "完成第一次合并",
+    icon: "⭐",
+    condition: (s) => s.totalMerges >= 1,
+  },
+  {
+    id: "score_100",
+    name: "百分达人",
+    description: "单局得分达到 100",
+    icon: "💯",
+    condition: (s) => s.score >= 100,
+  },
+  {
+    id: "score_500",
+    name: "高分玩家",
+    description: "单局得分达到 500",
+    icon: "🏆",
+    condition: (s) => s.score >= 500,
+  },
+  {
+    id: "score_1000",
+    name: "千分大师",
+    description: "单局得分达到 1000",
+    icon: "👑",
+    condition: (s) => s.score >= 1000,
+  },
+  {
+    id: "combo_3",
+    name: "连击新手",
+    description: "达成 3 连击",
+    icon: "🔥",
+    condition: (s) => s.maxCombo >= 3,
+  },
+  {
+    id: "combo_5",
+    name: "连击达人",
+    description: "达成 5 连击",
+    icon: "🔥🔥",
+    condition: (s) => s.maxCombo >= 5,
+  },
+  {
+    id: "merge_5",
+    name: "合并大师",
+    description: "单次合并 5 个方块",
+    icon: "💎",
+    condition: (s) => s.biggestMerge >= 5,
+  },
+  {
+    id: "level_5",
+    name: "等级提升",
+    description: "达到 5 级",
+    icon: "📈",
+    condition: (s) => s.level >= 5,
+  },
+  {
+    id: "pieces_50",
+    name: "坚持不懈",
+    description: "放置 50 个方块",
+    icon: "💪",
+    condition: (s) => s.totalPieces >= 50,
+  },
+  {
+    id: "play_5min",
+    name: "持久战",
+    description: "单局游戏超过 5 分钟",
+    icon: "⏱️",
+    condition: (s) => s.gameTime >= 300,
+  },
+];
+
+// Game statistics
+interface GameStats {
+  score: number;
+  level: number;
+  combo: number;
+  maxCombo: number;
+  totalMerges: number;
+  totalPieces: number;
+  biggestMerge: number;
+  gameTime: number;
+}
+
+const initialStats: GameStats = {
+  score: 0,
+  level: 1,
+  combo: 0,
+  maxCombo: 0,
+  totalMerges: 0,
+  totalPieces: 0,
+  biggestMerge: 0,
+  gameTime: 0,
+};
+
 function getLevel(exp: number): number {
   for (let i = LEVEL_THRESHOLDS.length - 1; i >= 0; i--) {
     if (exp >= LEVEL_THRESHOLDS[i]) return i + 1;
@@ -111,6 +216,13 @@ function addToLeaderboard(score: number): LeaderboardEntry[] {
   return trimmed;
 }
 
+// Format time as MM:SS
+function formatTime(seconds: number): string {
+  const m = Math.floor(seconds / 60);
+  const s = seconds % 60;
+  return `${m.toString().padStart(2, "0")}:${s.toString().padStart(2, "0")}`;
+}
+
 // Game state for undo
 interface GameState {
   grid: Grid;
@@ -139,6 +251,14 @@ export default function Game() {
   // Level system
   const [experience, setExperience] = useState(0);
   const [level, setLevel] = useState(1);
+  
+  // Statistics
+  const [stats, setStats] = useState<GameStats>(initialStats);
+  const [showStats, setShowStats] = useState(false);
+  
+  // Achievements
+  const [unlockedAchievements, setUnlockedAchievements] = useState<string[]>([]);
+  const [achievementPopup, setAchievementPopup] = useState<Achievement | null>(null);
 
   const gridRef = useRef(grid);
   const currentPieceRef = useRef(currentPiece);
@@ -152,6 +272,9 @@ export default function Game() {
   const experienceRef = useRef(0);
   const levelRef = useRef(1);
 
+  // Game start time
+  const gameStartTimeRef = useRef(Date.now());
+  
   // Touch state
   const touchStartRef = useRef<{ x: number; y: number; time: number } | null>(null);
 
@@ -205,6 +328,44 @@ export default function Game() {
     experienceRef.current = newExp;
     levelRef.current = newLevel;
   }, []);
+  
+  // Update statistics
+  const updateStats = useCallback((updates: Partial<GameStats>) => {
+    setStats(prev => {
+      const newStats = { ...prev, ...updates };
+      // Check for new achievements
+      const newUnlocked: string[] = [];
+      for (const achievement of ACHIEVEMENTS) {
+        if (!unlockedAchievements.includes(achievement.id) && achievement.condition(newStats)) {
+          newUnlocked.push(achievement.id);
+          // Show popup
+          setAchievementPopup(achievement);
+          setTimeout(() => setAchievementPopup(null), 3000);
+        }
+      }
+      if (newUnlocked.length > 0) {
+        setUnlockedAchievements(prev => [...prev, ...newUnlocked]);
+      }
+      return newStats;
+    });
+  }, [unlockedAchievements]);
+  
+  // Check achievements on mount
+  useEffect(() => {
+    const saved = localStorage.getItem("number-block-achievements");
+    if (saved) {
+      try {
+        setUnlockedAchievements(JSON.parse(saved));
+      } catch { /* ignore */ }
+    }
+  }, []);
+  
+  // Save achievements
+  useEffect(() => {
+    if (typeof window !== "undefined" && unlockedAchievements.length > 0) {
+      localStorage.setItem("number-block-achievements", JSON.stringify(unlockedAchievements));
+    }
+  }, [unlockedAchievements]);
 
   // Save state for undo
   const saveStateForUndo = useCallback(() => {
@@ -276,14 +437,29 @@ export default function Game() {
     addExperience(totalExp);
     
     // Update combo if merges happened
+    const newCombo = mergeCount > 0 ? comboRef.current + mergeCount : comboRef.current;
     if (mergeCount > 0) {
-      setCombo(prev => prev + mergeCount);
+      setCombo(newCombo);
       resetComboTimer();
     }
+    
+    // Update statistics
+    const comboMultiplier = Math.min(newCombo, 10);
+    const finalScore = Math.round(result.scoreGained * (1 + comboMultiplier * 0.5));
+    const newScore = score + finalScore;
+    
+    updateStats({
+      score: newScore,
+      level: levelRef.current,
+      combo: newCombo,
+      maxCombo: Math.max(stats.maxCombo, newCombo),
+      totalMerges: stats.totalMerges + mergeCount,
+      totalPieces: stats.totalPieces + 1,
+      biggestMerge: Math.max(stats.biggestMerge, mergeCount),
+      gameTime: Math.floor((Date.now() - gameStartTimeRef.current) / 1000),
+    });
 
-    // Calculate combo multiplier
-    const comboMultiplier = Math.min(comboRef.current, 10);
-    const finalScore = result.scoreGained * (1 + comboMultiplier * 0.5);
+
     
     // Add floating score
     if (result.scoreGained > 0) {
@@ -722,6 +898,26 @@ export default function Game() {
       className="flex flex-col items-center gap-8 select-none"
       style={{ fontFamily: '"SF Pro Display", "Geist Sans", system-ui, sans-serif' }}
     >
+      {/* Achievement Popup */}
+      {achievementPopup && (
+        <div
+          className="fixed top-6 left-1/2 z-50 px-5 py-3 flex items-center gap-3 rounded-lg"
+          style={{
+            background: "#FFFFFF",
+            border: "1px solid #EAEAEA",
+            boxShadow: "0 8px 24px rgba(0,0,0,0.08)",
+            transform: "translateX(-50%)",
+            animation: "slideIn 0.3s ease-out forwards",
+          }}
+        >
+          <span className="text-[24px]">{achievementPopup.icon}</span>
+          <div>
+            <div className="text-[11px] uppercase tracking-[0.08em] text-[#787774] font-medium">成就解锁</div>
+            <div className="text-[14px] font-semibold text-[#111111]">{achievementPopup.name}</div>
+            <div className="text-[11px] text-[#787774]">{achievementPopup.description}</div>
+          </div>
+        </div>
+      )}
 
       <div className="flex flex-col items-center gap-1">
         <h1 className="text-[22px] font-semibold tracking-[-0.02em] text-[#111111]">数字消除方块</h1>
@@ -819,6 +1015,68 @@ export default function Game() {
             )}
           </div>
 
+          {/* Statistics */}
+          <div className="p-5 cursor-pointer transition-all duration-200"
+            style={{ background: showStats ? "#F7F6F3" : "#FFFFFF", border: "1px solid #EAEAEA", borderRadius: "8px" }}
+            onClick={() => setShowStats(!showStats)}>
+            <div className="flex justify-between items-center mb-2">
+              <div className="text-[10px] uppercase tracking-[0.08em] text-[#787774] font-medium">统计</div>
+              <div className="text-[10px] text-[#787774]">{showStats ? "▲" : "▼"}</div>
+            </div>
+            {showStats ? (
+              <div className="flex flex-col gap-1.5">
+                <div className="flex justify-between text-[11px]">
+                  <span className="text-[#787774]">游戏时间</span>
+                  <span className="font-medium text-[#111111] tabular-nums">{formatTime(stats.gameTime)}</span>
+                </div>
+                <div className="flex justify-between text-[11px]">
+                  <span className="text-[#787774]">放置方块</span>
+                  <span className="font-medium text-[#111111] tabular-nums">{stats.totalPieces}</span>
+                </div>
+                <div className="flex justify-between text-[11px]">
+                  <span className="text-[#787774]">合并次数</span>
+                  <span className="font-medium text-[#111111] tabular-nums">{stats.totalMerges}</span>
+                </div>
+                <div className="flex justify-between text-[11px]">
+                  <span className="text-[#787774]">最高连击</span>
+                  <span className="font-medium text-[#9F2F2D] tabular-nums">×{stats.maxCombo}</span>
+                </div>
+                <div className="flex justify-between text-[11px]">
+                  <span className="text-[#787774]">最大合并</span>
+                  <span className="font-medium text-[#1F6C9F] tabular-nums">{stats.biggestMerge} 格</span>
+                </div>
+              </div>
+            ) : (
+              <div className="text-[11px] text-[#787774]">点击展开</div>
+            )}
+          </div>
+
+          {/* Achievements */}
+          <div className="p-5" style={{ background: "#FFFFFF", border: "1px solid #EAEAEA", borderRadius: "8px" }}>
+            <div className="flex justify-between items-center mb-2">
+              <div className="text-[10px] uppercase tracking-[0.08em] text-[#787774] font-medium">成就</div>
+              <div className="text-[10px] text-[#787774]">{unlockedAchievements.length}/{ACHIEVEMENTS.length}</div>
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              {ACHIEVEMENTS.map((a) => (
+                <div
+                  key={a.id}
+                  className="w-[28px] h-[28px] flex items-center justify-center rounded"
+                  style={{
+                    background: unlockedAchievements.includes(a.id) ? "#FBF3DB" : "#F7F6F3",
+                    border: "1px solid #EAEAEA",
+                    fontSize: "14px",
+                    opacity: unlockedAchievements.includes(a.id) ? 1 : 0.4,
+                    cursor: "default",
+                  }}
+                  title={`${a.name}: ${a.description}`}
+                >
+                  {a.icon}
+                </div>
+              ))}
+            </div>
+          </div>
+
           {/* Controls */}
           <div className="px-5 py-4" style={{ background: "#FFFFFF", border: "1px solid #EAEAEA", borderRadius: "8px" }}>
             <div className="text-[10px] uppercase tracking-[0.08em] text-[#787774] mb-3 font-medium">操作</div>
@@ -871,5 +1129,6 @@ export default function Game() {
         </div>
       </div>
     </div>
+
   );
 }
