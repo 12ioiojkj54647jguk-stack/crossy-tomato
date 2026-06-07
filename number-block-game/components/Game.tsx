@@ -916,8 +916,11 @@ export default function Game() {
 
   return (
     <main
-      className="flex w-full flex-col items-center gap-8 px-4 py-6 select-none"
-      style={{ fontFamily: '"SF Pro Display", "Geist Sans", system-ui, sans-serif' }}
+      className="flex w-full flex-col items-center gap-8 px-4 py-8 select-none"
+      style={{ 
+        fontFamily: '"SF Pro Display", "Geist Sans", system-ui, sans-serif',
+        minHeight: '100vh',
+      }}
     >
       {/* Achievement Popup */}
       {achievementPopup && (
@@ -950,53 +953,82 @@ export default function Game() {
         <p className="text-[12px] text-[#787774] tracking-wide">相邻三个相同数字自动合并</p>
       </div>
 
-      <div className="flex w-full max-w-[560px] flex-col items-center gap-6 lg:max-w-[520px] lg:flex-row lg:items-start lg:justify-center lg:gap-8">
-        <div className="relative w-[302px] shrink-0">
+      <div className="flex w-full max-w-[580px] flex-col items-center gap-6 lg:max-w-[540px] lg:flex-row lg:items-start lg:justify-center lg:gap-10">
+        <div className="relative w-[302px] shrink-0 canvas-container" style={{ borderRadius: "12px" }}>
           <canvas
             ref={canvasRef}
             width={BOARD_WIDTH}
             height={BOARD_HEIGHT}
             className="block"
-            style={{ borderRadius: "8px", border: "1px solid #EAEAEA", background: "#F7F6F3" }}
+            style={{ 
+              borderRadius: "12px", 
+              border: "1px solid #E5E5E5", 
+              background: "#FAFAFA",
+            }}
             tabIndex={0}
           />
         </div>
 
-        <aside className="flex w-full max-w-[302px] flex-col gap-4 lg:w-[180px] lg:max-w-[180px] lg:shrink-0">
+        <aside className="flex w-full max-w-[302px] flex-col gap-3 lg:w-[200px] lg:max-w-[200px] lg:shrink-0">
           {/* Level */}
-          <div className="p-5" style={{ background: "#FFFFFF", border: "1px solid #EAEAEA", borderRadius: "8px" }}>
-            <div className="flex justify-between items-center mb-2">
+          <div className="panel-card">
+            <div className="flex justify-between items-center mb-3">
               <div className="text-[10px] uppercase tracking-[0.08em] text-[#787774] font-medium">等級</div>
-              <div className="text-[18px] font-bold text-[#1F6C9F]">Lv.{level}</div>
+              <div className="text-[20px] font-bold" style={{ color: "#956400" }}>Lv.{level}</div>
             </div>
-            <div className="h-[6px] rounded-full overflow-hidden" style={{ background: "#EAEAEA" }}>
+            <div className="relative h-[8px] rounded-full overflow-hidden" style={{ background: "#F0F0F0" }}>
               <div
-                className="h-full rounded-full transition-all duration-300"
+                className="h-full rounded-full transition-all duration-500 ease-out"
                 style={{
                   width: `${Math.min(expProgress, 100)}%`,
-                  background: "#956400",
+                  background: "linear-gradient(90deg, #956400, #D4A574)",
                 }}
               />
+              {expProgress > 0 && (
+                <div 
+                  className="absolute top-0 h-full w-[30%] rounded-full"
+                  style={{
+                    background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent)",
+                    animation: "progressShine 2s ease-in-out infinite",
+                  }}
+                />
+              )}
             </div>
-            <div className="text-[10px] text-[#787774] mt-1 text-right">{experience} / {nextLevelExp} EXP</div>
+            <div className="text-[10px] text-[#787774] mt-2 text-right tabular-nums">{experience} / {nextLevelExp} EXP</div>
           </div>
 
           {/* Score */}
-          <div className="p-5" style={{ background: "#FFFFFF", border: "1px solid #EAEAEA", borderRadius: "8px" }}>
+          <div className="panel-card">
             <div className="text-[10px] uppercase tracking-[0.08em] text-[#787774] mb-2 font-medium">得分</div>
-            <div className="text-[28px] font-semibold tracking-[-0.03em] text-[#111111] tabular-nums">{score}</div>
-            <div className="h-[20px] mt-2">
+            <div 
+              className="text-[32px] font-bold tracking-[-0.03em] tabular-nums transition-all duration-200"
+              style={{ 
+                color: combo > 0 ? "#9F2F2D" : "#111111",
+              }}
+            >
+              {score}
+            </div>
+            <div className="h-[22px] mt-2">
               {combo > 0 && !gameOver && (
-                <div className="text-[11px] font-semibold px-2 py-1 inline-block"
-                  style={{ background: "#FDEBEC", color: "#9F2F2D", borderRadius: "4px" }}>
+                <div 
+                  className="text-[11px] font-semibold px-2 py-1 inline-block"
+                  style={{ 
+                    background: "linear-gradient(135deg, #FDEBEC, #FFE8E0)", 
+                    color: "#9F2F2D", 
+                    borderRadius: "6px",
+                    animation: "comboFlash 1s ease-in-out infinite",
+                  }}
+                >
                   🔥 连击 ×{combo}
                 </div>
               )}
             </div>
-            <div className="h-[18px] mt-1">
+            <div className="h-[20px] mt-1">
               {undoCount > 0 && !gameOver && (
-                <div className="text-[10px] px-2 py-1 inline-block"
-                  style={{ background: "#E1F3FE", color: "#1F6C9F", borderRadius: "4px" }}>
+                <div 
+                  className="text-[10px] px-2 py-1 inline-block"
+                  style={{ background: "#E1F3FE", color: "#1F6C9F", borderRadius: "4px" }}
+                >
                   ↩️ 可撤销 {undoCount}/3
                 </div>
               )}
@@ -1004,20 +1036,31 @@ export default function Game() {
           </div>
 
           {/* Next */}
-          <div className="p-5" style={{ background: "#FFFFFF", border: "1px solid #EAEAEA", borderRadius: "8px" }}>
+          <div className="panel-card">
             <div className="text-[10px] uppercase tracking-[0.08em] text-[#787774] mb-3 font-medium">下一个</div>
             <div className="flex justify-center">
-              <div className="w-[44px] h-[44px] flex items-center justify-center font-semibold text-[15px]"
-                style={{ background: getBlockStyle(nextValue).bg, color: getBlockStyle(nextValue).text, borderRadius: "6px", border: "1px solid #EAEAEA" }}>
+              <div 
+                className="w-[48px] h-[48px] flex items-center justify-center font-semibold text-[16px]"
+                style={{ 
+                  background: getBlockStyle(nextValue).bg, 
+                  color: getBlockStyle(nextValue).text, 
+                  borderRadius: "8px", 
+                  border: "1px solid #E5E5E5",
+                  animation: "breathe 2s ease-in-out infinite",
+                  boxShadow: "0 4px 12px rgba(0,0,0,0.08)",
+                }}
+              >
                 {nextValue}
               </div>
             </div>
           </div>
 
           {/* Leaderboard */}
-          <div className="p-5 cursor-pointer transition-all duration-200"
-            style={{ background: showLeaderboard ? "#F7F6F3" : "#FFFFFF", border: "1px solid #EAEAEA", borderRadius: "8px" }}
-            onClick={() => setShowLeaderboard(!showLeaderboard)}>
+          <div 
+            className="panel-card cursor-pointer"
+            style={{ background: showLeaderboard ? "#F7F6F3" : "#FFFFFF" }}
+            onClick={() => setShowLeaderboard(!showLeaderboard)}
+          >
             <div className="flex justify-between items-center mb-2">
               <div className="text-[10px] uppercase tracking-[0.08em] text-[#787774] font-medium">排行榜</div>
               <div className="text-[10px] text-[#787774]">{showLeaderboard ? "▲" : "▼"}</div>
@@ -1042,35 +1085,29 @@ export default function Game() {
           </div>
 
           {/* Statistics */}
-          <div className="p-5 cursor-pointer transition-all duration-200"
-            style={{ background: showStats ? "#F7F6F3" : "#FFFFFF", border: "1px solid #EAEAEA", borderRadius: "8px" }}
-            onClick={() => setShowStats(!showStats)}>
+          <div 
+            className="panel-card cursor-pointer"
+            style={{ background: showStats ? "#F7F6F3" : "#FFFFFF" }}
+            onClick={() => setShowStats(!showStats)}
+          >
             <div className="flex justify-between items-center mb-2">
               <div className="text-[10px] uppercase tracking-[0.08em] text-[#787774] font-medium">统计</div>
               <div className="text-[10px] text-[#787774]">{showStats ? "▲" : "▼"}</div>
             </div>
             {showStats ? (
               <div className="flex flex-col gap-1.5">
-                <div className="flex justify-between text-[11px]">
-                  <span className="text-[#787774]">游戏时间</span>
-                  <span className="font-medium text-[#111111] tabular-nums">{formatTime(stats.gameTime)}</span>
-                </div>
-                <div className="flex justify-between text-[11px]">
-                  <span className="text-[#787774]">放置方块</span>
-                  <span className="font-medium text-[#111111] tabular-nums">{stats.totalPieces}</span>
-                </div>
-                <div className="flex justify-between text-[11px]">
-                  <span className="text-[#787774]">合并次数</span>
-                  <span className="font-medium text-[#111111] tabular-nums">{stats.totalMerges}</span>
-                </div>
-                <div className="flex justify-between text-[11px]">
-                  <span className="text-[#787774]">最高连击</span>
-                  <span className="font-medium text-[#9F2F2D] tabular-nums">×{stats.maxCombo}</span>
-                </div>
-                <div className="flex justify-between text-[11px]">
-                  <span className="text-[#787774]">最大合并</span>
-                  <span className="font-medium text-[#1F6C9F] tabular-nums">{stats.biggestMerge} 格</span>
-                </div>
+                {[
+                  ["游戏时间", formatTime(stats.gameTime)],
+                  ["放置方块", String(stats.totalPieces)],
+                  ["合并次数", String(stats.totalMerges)],
+                  ["最高连击", `×${stats.maxCombo}`],
+                  ["最大合并", `${stats.biggestMerge} 格`],
+                ].map(([label, value]) => (
+                  <div key={label} className="flex justify-between text-[11px]">
+                    <span className="text-[#787774]">{label}</span>
+                    <span className="font-medium text-[#111111] tabular-nums">{value}</span>
+                  </div>
+                ))}
               </div>
             ) : (
               <div className="text-[11px] text-[#787774]">点击展开</div>
@@ -1134,7 +1171,7 @@ export default function Game() {
           </div>
 
           {/* Controls */}
-          <div className="px-5 py-4" style={{ background: "#FFFFFF", border: "1px solid #EAEAEA", borderRadius: "8px" }}>
+          <div className="panel-card">
             <div className="text-[10px] uppercase tracking-[0.08em] text-[#787774] mb-3 font-medium">操作</div>
             <div className="flex flex-col gap-2">
               {[
@@ -1145,10 +1182,7 @@ export default function Game() {
                 ["Z", "撤销"],
               ].map(([key, desc]) => (
                 <div key={key} className="flex items-center gap-3">
-                  <span className="inline-flex items-center justify-center min-w-[28px] h-[22px] px-1.5 text-[10px] font-medium"
-                    style={{ background: "#F7F6F3", border: "1px solid #EAEAEA", borderRadius: "4px", color: "#555", fontFamily: '"SF Mono", "Geist Mono", monospace' }}>
-                    {key}
-                  </span>
+                  <span className="key-badge">{key}</span>
                   <span className="text-[12px] text-[#787774]">{desc}</span>
                 </div>
               ))}
@@ -1157,28 +1191,37 @@ export default function Game() {
 
           {/* Buttons */}
           <div className="flex flex-col gap-2">
-            <div className="h-[38px]">
+            <div className="h-[40px]">
               {showShareButton && (
                 <button onClick={shareScore}
-                  className="w-full py-2.5 px-4 text-[13px] font-medium transition-all duration-200 hover:opacity-90 active:scale-[0.98] focus:outline-none focus:ring-2 focus:ring-[#956400]/30"
-                  style={{ background: "#1F6C9F", color: "#FFFFFF", borderRadius: "6px", border: "none", cursor: "pointer" }}>
+                  className="w-full py-2.5 text-[13px] font-medium rounded-lg btn-hover"
+                  style={{ background: "#956400", color: "#FFFFFF", border: "none" }}>
                   分享成绩
                 </button>
               )}
             </div>
             <button onClick={endGame} disabled={gameOver}
-              className="w-full py-2.5 px-4 text-[13px] font-medium transition-all duration-200 enabled:hover:opacity-90 enabled:active:scale-[0.98] focus:outline-none focus:ring-2 focus:ring-[#956400]/30"
-              style={{ background: gameOver ? "#EAEAEA" : "#111111", color: gameOver ? "#AAA" : "#FFFFFF", borderRadius: "6px", border: "none", cursor: gameOver ? "default" : "pointer" }}>
+              className="w-full py-2.5 text-[13px] font-medium rounded-lg btn-hover"
+              style={{ 
+                background: gameOver ? "#F5F5F5" : "#111111", 
+                color: gameOver ? "#AAA" : "#FFFFFF", 
+                border: "none",
+                cursor: gameOver ? "default" : "pointer",
+              }}>
               结束游戏
             </button>
             <button onClick={restart}
-              className="w-full py-2.5 px-4 text-[13px] font-medium transition-all duration-200 hover:bg-[#FFFFFF] active:scale-[0.98] focus:outline-none focus:ring-2 focus:ring-[#956400]/30"
-              style={{ background: "#F7F6F3", color: "#111111", borderRadius: "6px", border: "1px solid #EAEAEA", cursor: "pointer" }}>
+              className="w-full py-2.5 text-[13px] font-medium rounded-lg btn-hover"
+              style={{ background: "#F7F6F3", color: "#111111", border: "1px solid #E5E5E5" }}>
               重新开始
             </button>
             <button onClick={() => setIsPaused(p => !p)} disabled={gameOver}
-              className="w-full py-2.5 px-4 text-[13px] font-medium transition-all duration-200 enabled:hover:bg-[#F7F6F3] enabled:active:scale-[0.98] focus:outline-none focus:ring-2 focus:ring-[#956400]/30"
-              style={{ background: gameOver ? "#F7F6F3" : "#FFFFFF", color: gameOver ? "#AAA" : "#111111", borderRadius: "6px", border: "1px solid #EAEAEA", cursor: gameOver ? "default" : "pointer" }}>
+              className="w-full py-2.5 text-[13px] font-medium rounded-lg btn-hover"
+              style={{ 
+                background: gameOver ? "#F7F6F3" : "#FFFFFF", 
+                color: gameOver ? "#AAA" : "#111111", 
+                border: "1px solid #E5E5E5" 
+              }}>
               {isPaused ? "继续" : "暂停"}
             </button>
           </div>
