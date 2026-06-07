@@ -904,19 +904,20 @@ export default function Game() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const startGame = useCallback(() => {
-    restart();
-  }, [restart]);
-
   const currentLevelExp = LEVEL_THRESHOLDS[level - 1] || 0;
   const nextLevelExp = getExpForNextLevel(level);
   const expProgress = level >= LEVEL_THRESHOLDS.length 
     ? 100 
     : ((experience - currentLevelExp) / (nextLevelExp - currentLevelExp)) * 100;
 
+  const startGame = useCallback(() => {
+    restart();
+  }, [restart]);
+
+
   return (
     <main
-      className="flex w-full flex-col items-center gap-8 px-4 py-8 select-none"
+      className="flex w-full flex-col items-center gap-6 px-4 py-8 select-none"
       style={{ 
         fontFamily: '"SF Pro Display", "Geist Sans", system-ui, sans-serif',
         minHeight: '100vh',
@@ -948,12 +949,69 @@ export default function Game() {
         </div>
       )}
 
-      <div className="flex flex-col items-center gap-1">
-        <h1 className="text-[22px] font-semibold tracking-[-0.02em] text-[#111111]">数字消除方块</h1>
-        <p className="text-[12px] text-[#787774] tracking-wide">相邻三个相同数字自动合并</p>
+      {/* Header - Title + Level + Score */}
+      <div className="flex w-full max-w-[760px] items-center justify-between gap-4">
+        <div className="flex flex-col">
+          <h1 className="text-[22px] font-semibold tracking-[-0.02em] text-[#111111]">数字消除方块</h1>
+          <p className="text-[12px] text-[#787774] tracking-wide">相邻三个相同数字自动合并</p>
+        </div>
+        
+        {/* Level Progress - Center */}
+        <div className="flex-1 max-w-[300px] px-4">
+          <div className="flex justify-between items-center mb-1">
+            <div className="text-[10px] uppercase tracking-[0.08em] text-[#787774] font-medium">Lv.{level}</div>
+            <div className="text-[10px] text-[#787774] tabular-nums">{experience} / {nextLevelExp}</div>
+          </div>
+          <div className="relative h-[8px] rounded-full overflow-hidden" style={{ background: "#F0F0F0" }}>
+            <div
+              className="h-full rounded-full transition-all duration-500 ease-out"
+              style={{
+                width: `${Math.min(expProgress, 100)}%`,
+                background: "linear-gradient(90deg, #956400, #D4A574)",
+              }}
+            />
+            {expProgress > 0 && (
+              <div 
+                className="absolute top-0 h-full w-[30%] rounded-full"
+                style={{
+                  background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent)",
+                  animation: "progressShine 2s ease-in-out infinite",
+                }}
+              />
+            )}
+          </div>
+        </div>
+
+        {/* Score - Right */}
+        <div className="flex flex-col items-end">
+          <div className="text-[10px] uppercase tracking-[0.08em] text-[#787774] font-medium">得分</div>
+          <div 
+            className="text-[28px] font-bold tracking-[-0.03em] tabular-nums transition-all duration-200"
+            style={{ 
+              color: combo > 0 ? "#9F2F2D" : "#111111",
+            }}
+          >
+            {score}
+          </div>
+          {combo > 0 && !gameOver && (
+            <div 
+              className="text-[11px] font-semibold px-2 py-0.5 mt-1"
+              style={{ 
+                background: "linear-gradient(135deg, #FDEBEC, #FFE8E0)", 
+                color: "#9F2F2D", 
+                borderRadius: "4px",
+                animation: "comboFlash 1s ease-in-out infinite",
+              }}
+            >
+              🔥 连击 ×{combo}
+            </div>
+          )}
+        </div>
       </div>
 
-      <div className="flex w-full max-w-[580px] flex-col items-center gap-6 lg:max-w-[540px] lg:flex-row lg:items-start lg:justify-center lg:gap-10">
+      {/* Main Content - Canvas + Right Sidebar */}
+      <div className="flex w-full max-w-[760px] items-start justify-center gap-6">
+        {/* Canvas */}
         <div className="relative w-[302px] shrink-0 canvas-container" style={{ borderRadius: "12px" }}>
           <canvas
             ref={canvasRef}
@@ -969,72 +1027,8 @@ export default function Game() {
           />
         </div>
 
-        <aside className="flex w-full max-w-[302px] flex-col gap-3 lg:w-[200px] lg:max-w-[200px] lg:shrink-0">
-          {/* Level */}
-          <div className="panel-card">
-            <div className="flex justify-between items-center mb-3">
-              <div className="text-[10px] uppercase tracking-[0.08em] text-[#787774] font-medium">等級</div>
-              <div className="text-[20px] font-bold" style={{ color: "#956400" }}>Lv.{level}</div>
-            </div>
-            <div className="relative h-[8px] rounded-full overflow-hidden" style={{ background: "#F0F0F0" }}>
-              <div
-                className="h-full rounded-full transition-all duration-500 ease-out"
-                style={{
-                  width: `${Math.min(expProgress, 100)}%`,
-                  background: "linear-gradient(90deg, #956400, #D4A574)",
-                }}
-              />
-              {expProgress > 0 && (
-                <div 
-                  className="absolute top-0 h-full w-[30%] rounded-full"
-                  style={{
-                    background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent)",
-                    animation: "progressShine 2s ease-in-out infinite",
-                  }}
-                />
-              )}
-            </div>
-            <div className="text-[10px] text-[#787774] mt-2 text-right tabular-nums">{experience} / {nextLevelExp} EXP</div>
-          </div>
-
-          {/* Score */}
-          <div className="panel-card">
-            <div className="text-[10px] uppercase tracking-[0.08em] text-[#787774] mb-2 font-medium">得分</div>
-            <div 
-              className="text-[32px] font-bold tracking-[-0.03em] tabular-nums transition-all duration-200"
-              style={{ 
-                color: combo > 0 ? "#9F2F2D" : "#111111",
-              }}
-            >
-              {score}
-            </div>
-            <div className="h-[22px] mt-2">
-              {combo > 0 && !gameOver && (
-                <div 
-                  className="text-[11px] font-semibold px-2 py-1 inline-block"
-                  style={{ 
-                    background: "linear-gradient(135deg, #FDEBEC, #FFE8E0)", 
-                    color: "#9F2F2D", 
-                    borderRadius: "6px",
-                    animation: "comboFlash 1s ease-in-out infinite",
-                  }}
-                >
-                  🔥 连击 ×{combo}
-                </div>
-              )}
-            </div>
-            <div className="h-[20px] mt-1">
-              {undoCount > 0 && !gameOver && (
-                <div 
-                  className="text-[10px] px-2 py-1 inline-block"
-                  style={{ background: "#E1F3FE", color: "#1F6C9F", borderRadius: "4px" }}
-                >
-                  ↩️ 可撤销 {undoCount}/3
-                </div>
-              )}
-            </div>
-          </div>
-
+        {/* Right Sidebar */}
+        <aside className="flex w-[200px] shrink-0 flex-col gap-3">
           {/* Next */}
           <div className="panel-card">
             <div className="text-[10px] uppercase tracking-[0.08em] text-[#787774] mb-3 font-medium">下一个</div>
@@ -1084,92 +1078,6 @@ export default function Game() {
             )}
           </div>
 
-          {/* Statistics */}
-          <div 
-            className="panel-card cursor-pointer"
-            style={{ background: showStats ? "#F7F6F3" : "#FFFFFF" }}
-            onClick={() => setShowStats(!showStats)}
-          >
-            <div className="flex justify-between items-center mb-2">
-              <div className="text-[10px] uppercase tracking-[0.08em] text-[#787774] font-medium">统计</div>
-              <div className="text-[10px] text-[#787774]">{showStats ? "▲" : "▼"}</div>
-            </div>
-            {showStats ? (
-              <div className="flex flex-col gap-1.5">
-                {[
-                  ["游戏时间", formatTime(stats.gameTime)],
-                  ["放置方块", String(stats.totalPieces)],
-                  ["合并次数", String(stats.totalMerges)],
-                  ["最高连击", `×${stats.maxCombo}`],
-                  ["最大合并", `${stats.biggestMerge} 格`],
-                ].map(([label, value]) => (
-                  <div key={label} className="flex justify-between text-[11px]">
-                    <span className="text-[#787774]">{label}</span>
-                    <span className="font-medium text-[#111111] tabular-nums">{value}</span>
-                  </div>
-                ))}
-              </div>
-            ) : (
-              <div className="text-[11px] text-[#787774]">点击展开</div>
-            )}
-          </div>
-
-          {/* Game summary */}
-          <div className="min-h-[118px] p-5" style={{ background: "#FFFFFF", border: "1px solid #EAEAEA", borderRadius: "8px" }}>
-            <div className="flex justify-between items-center mb-2">
-              <div className="text-[10px] uppercase tracking-[0.08em] text-[#787774] font-medium">本局结算</div>
-              <div className="text-[10px] text-[#787774]">{gameOver ? "完成" : "进行中"}</div>
-            </div>
-            {gameSummary ? (
-              <div className="flex flex-col gap-1.5">
-                <div className="flex justify-between text-[11px]">
-                  <span className="text-[#787774]">最终得分</span>
-                  <span className="font-semibold text-[#111111] tabular-nums">{gameSummary.score}</span>
-                </div>
-                <div className="flex justify-between text-[11px]">
-                  <span className="text-[#787774]">等级</span>
-                  <span className="font-medium text-[#956400] tabular-nums">Lv.{gameSummary.level}</span>
-                </div>
-                <div className="flex justify-between text-[11px]">
-                  <span className="text-[#787774]">最高连击</span>
-                  <span className="font-medium text-[#9F2F2D] tabular-nums">×{gameSummary.maxCombo}</span>
-                </div>
-                <div className="flex justify-between text-[11px]">
-                  <span className="text-[#787774]">纪录</span>
-                  <span className="font-medium text-[#111111]">{gameSummary.isRecord ? "新纪录" : "已记录"}</span>
-                </div>
-              </div>
-            ) : (
-              <div className="text-[11px] leading-5 text-[#787774]">结束后显示最终成绩、等级和连击表现。</div>
-            )}
-          </div>
-
-          {/* Achievements */}
-          <div className="p-5" style={{ background: "#FFFFFF", border: "1px solid #EAEAEA", borderRadius: "8px" }}>
-            <div className="flex justify-between items-center mb-2">
-              <div className="text-[10px] uppercase tracking-[0.08em] text-[#787774] font-medium">成就</div>
-              <div className="text-[10px] text-[#787774]">{unlockedAchievements.length}/{ACHIEVEMENTS.length}</div>
-            </div>
-            <div className="flex flex-wrap gap-1.5">
-              {ACHIEVEMENTS.map((a) => (
-                <div
-                  key={a.id}
-                  className="w-[28px] h-[28px] flex items-center justify-center rounded"
-                  style={{
-                    background: unlockedAchievements.includes(a.id) ? "#FBF3DB" : "#F7F6F3",
-                    border: "1px solid #EAEAEA",
-                    fontSize: "14px",
-                    opacity: unlockedAchievements.includes(a.id) ? 1 : 0.4,
-                    cursor: "default",
-                  }}
-                  title={`${a.name}: ${a.description}`}
-                >
-                  {a.icon}
-                </div>
-              ))}
-            </div>
-          </div>
-
           {/* Controls */}
           <div className="panel-card">
             <div className="text-[10px] uppercase tracking-[0.08em] text-[#787774] mb-3 font-medium">操作</div>
@@ -1191,7 +1099,7 @@ export default function Game() {
 
           {/* Buttons */}
           <div className="flex flex-col gap-2">
-            <div className="h-[40px]">
+            <div className="min-h-[40px]">
               {showShareButton && (
                 <button onClick={shareScore}
                   className="w-full py-2.5 text-[13px] font-medium rounded-lg btn-hover"
@@ -1200,19 +1108,9 @@ export default function Game() {
                 </button>
               )}
             </div>
-            <button onClick={endGame} disabled={gameOver}
-              className="w-full py-2.5 text-[13px] font-medium rounded-lg btn-hover"
-              style={{ 
-                background: gameOver ? "#F5F5F5" : "#111111", 
-                color: gameOver ? "#AAA" : "#FFFFFF", 
-                border: "none",
-                cursor: gameOver ? "default" : "pointer",
-              }}>
-              结束游戏
-            </button>
             <button onClick={restart}
               className="w-full py-2.5 text-[13px] font-medium rounded-lg btn-hover"
-              style={{ background: "#F7F6F3", color: "#111111", border: "1px solid #E5E5E5" }}>
+              style={{ background: "#111111", color: "#FFFFFF", border: "none" }}>
               重新开始
             </button>
             <button onClick={() => setIsPaused(p => !p)} disabled={gameOver}
@@ -1226,6 +1124,70 @@ export default function Game() {
             </button>
           </div>
         </aside>
+      </div>
+
+      {/* Bottom Section - Stats & Achievements */}
+      <div className="flex w-full max-w-[760px] gap-4">
+        {/* Statistics */}
+        <div 
+          className="panel-card flex-1 cursor-pointer"
+          style={{ background: showStats ? "#F7F6F3" : "#FFFFFF" }}
+          onClick={() => setShowStats(!showStats)}
+        >
+          <div className="flex justify-between items-center mb-2">
+            <div className="text-[10px] uppercase tracking-[0.08em] text-[#787774] font-medium">统计</div>
+            <div className="text-[10px] text-[#787774]">{showStats ? "▲" : "▼"}</div>
+          </div>
+          {showStats ? (
+            <div className="grid grid-cols-2 gap-x-4 gap-y-1.5">
+              {[
+                ["游戏时间", formatTime(stats.gameTime)],
+                ["放置方块", String(stats.totalPieces)],
+                ["合并次数", String(stats.totalMerges)],
+                ["最高连击", `×${stats.maxCombo}`],
+                ["最大合并", `${stats.biggestMerge} 格`],
+              ].map(([label, value]) => (
+                <div key={label} className="flex justify-between text-[11px]">
+                  <span className="text-[#787774]">{label}</span>
+                  <span className="font-medium text-[#111111] tabular-nums">{value}</span>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-[11px] text-[#787774]">点击展开</div>
+          )}
+        </div>
+
+        {/* Achievements */}
+        <div className="panel-card flex-1">
+          <div className="flex justify-between items-center mb-3">
+            <div className="text-[10px] uppercase tracking-[0.08em] text-[#787774] font-medium">成就</div>
+            <div className="text-[10px] px-2 py-0.5 rounded-full" style={{ background: "#F7F6F3", color: "#787774" }}>
+              {unlockedAchievements.length}/{ACHIEVEMENTS.length}
+            </div>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {ACHIEVEMENTS.map((a) => (
+              <div
+                key={a.id}
+                className="w-[32px] h-[32px] flex items-center justify-center rounded-lg transition-all duration-200"
+                style={{
+                  background: unlockedAchievements.includes(a.id) 
+                    ? "linear-gradient(135deg, #FBF3DB, #F5E6C8)" 
+                    : "#F7F6F3",
+                  border: `1px solid ${unlockedAchievements.includes(a.id) ? "#E5D4A5" : "#EAEAEA"}`,
+                  fontSize: "16px",
+                  opacity: unlockedAchievements.includes(a.id) ? 1 : 0.4,
+                  cursor: "default",
+                  boxShadow: unlockedAchievements.includes(a.id) ? "0 2px 4px rgba(0,0,0,0.08)" : "none",
+                }}
+                title={`${a.name}: ${a.description}`}
+              >
+                {a.icon}
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
     </main>
 
