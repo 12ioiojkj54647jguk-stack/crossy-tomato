@@ -740,7 +740,7 @@ export default function Game() {
           />
         </div>
 
-        <div className="flex flex-col gap-4 min-w-[160px]">
+        <div className="flex flex-col gap-4 w-[180px]">
           {/* Level */}
           <div className="p-5" style={{ background: "#FFFFFF", border: "1px solid #EAEAEA", borderRadius: "8px" }}>
             <div className="flex justify-between items-center mb-2">
@@ -763,18 +763,22 @@ export default function Game() {
           <div className="p-5" style={{ background: "#FFFFFF", border: "1px solid #EAEAEA", borderRadius: "8px" }}>
             <div className="text-[10px] uppercase tracking-[0.08em] text-[#787774] mb-2 font-medium">得分</div>
             <div className="text-[28px] font-semibold tracking-[-0.03em] text-[#111111] tabular-nums">{score}</div>
-            {combo > 0 && !gameOver && (
-              <div className="mt-2 text-[11px] font-semibold px-2 py-1 inline-block"
-                style={{ background: "#FDEBEC", color: "#9F2F2D", borderRadius: "4px" }}>
-                🔥 连击 ×{combo}
-              </div>
-            )}
-            {undoCount > 0 && !gameOver && (
-              <div className="mt-1 text-[10px] px-2 py-1 inline-block"
-                style={{ background: "#E1F3FE", color: "#1F6C9F", borderRadius: "4px" }}>
-                ↩️ 可撤销 {undoCount}/3
-              </div>
-            )}
+            <div className="h-[20px] mt-2">
+              {combo > 0 && !gameOver && (
+                <div className="text-[11px] font-semibold px-2 py-1 inline-block"
+                  style={{ background: "#FDEBEC", color: "#9F2F2D", borderRadius: "4px" }}>
+                  🔥 连击 ×{combo}
+                </div>
+              )}
+            </div>
+            <div className="h-[18px] mt-1">
+              {undoCount > 0 && !gameOver && (
+                <div className="text-[10px] px-2 py-1 inline-block"
+                  style={{ background: "#E1F3FE", color: "#1F6C9F", borderRadius: "4px" }}>
+                  ↩️ 可撤销 {undoCount}/3
+                </div>
+              )}
+            </div>
           </div>
 
           {/* Next */}
@@ -839,13 +843,15 @@ export default function Game() {
 
           {/* Buttons */}
           <div className="flex flex-col gap-2">
-            {showShareButton && (
-              <button onClick={shareScore}
-                className="w-full py-2.5 px-4 text-[13px] font-medium transition-all duration-200"
-                style={{ background: "#1F6C9F", color: "#FFFFFF", borderRadius: "6px", border: "none", cursor: "pointer" }}>
-                📤 分享成绩
-              </button>
-            )}
+            <div className="h-[38px]">
+              {showShareButton && (
+                <button onClick={shareScore}
+                  className="w-full py-2.5 px-4 text-[13px] font-medium transition-all duration-200"
+                  style={{ background: "#1F6C9F", color: "#FFFFFF", borderRadius: "6px", border: "none", cursor: "pointer" }}>
+                  📤 分享成绩
+                </button>
+              )}
+            </div>
             <button onClick={endGame} disabled={gameOver}
               className="w-full py-2.5 px-4 text-[13px] font-medium transition-all duration-200"
               style={{ background: gameOver ? "#EAEAEA" : "#111111", color: gameOver ? "#AAA" : "#FFFFFF", borderRadius: "6px", border: "none", cursor: gameOver ? "default" : "pointer" }}>
