@@ -22,9 +22,17 @@ export interface MergeResult {
   placeAt: Position;
 }
 
+export interface MergeEvent {
+  positions: Position[];
+  sum: number;
+  score: number;
+  placeAt: Position;
+}
+
 export interface StabilizeResult {
   grid: Grid;
   scoreGained: number;
+  mergeEvents: MergeEvent[];
 }
 
 // 创建空网格
@@ -45,12 +53,6 @@ export function generateRandomValue(): number {
   return 8;
 }
 
-// 生成特殊方塊（炸彈或冰凍）
-export function generateSpecialValue(): number {
-  // 50% 機率炸彈 (0), 50% 機率冰凍 (-1)
-  return Math.random() < 0.5 ? 0 : -1;
-}
-
 // 生成新方块（頂部中間）
 export function spawnPiece(value: number): Piece {
   return { x: Math.floor(COLS / 2), y: 0, value };
@@ -65,7 +67,7 @@ export function isValidMove(grid: Grid, x: number, y: number): boolean {
 // 查找連通塊（BFS）
 export function findConnected(grid: Grid, startX: number, startY: number, visited: boolean[][]): Position[] {
   const value = grid[startY][startX];
-  if (value <= 0) return [];  // 特殊方塊不參與合併
+  if (value <= 0) return [];
 
   const positions: Position[] = [];
   const queue: Position[] = [{ x: startX, y: startY }];
@@ -176,26 +178,11 @@ export function applySingleMerge(grid: Grid, merge: MergeResult): number {
   return score;
 }
 
-// 炸彈效果：清除周圍 3x3 區域
-export function applyBomb(grid: Grid, x: number, y: number): Position[] {
-  const cleared: Position[] = [];
-  for (let dy = -1; dy <= 1; dy++) {
-    for (let dx = -1; dx <= 1; dx++) {
-      const nx = x + dx;
-      const ny = y + dy;
-      if (nx >= 0 && nx < COLS && ny >= 0 && ny < ROWS && grid[ny][nx] !== 0) {
-        cleared.push({ x: nx, y: ny });
-        grid[ny][nx] = 0;
-      }
-    }
-  }
-  return cleared;
-}
-
 // 遞歸穩定化：合併+重力直到沒有可合併的
 export function stabilize(grid: Grid): StabilizeResult {
   const newGrid = cloneGrid(grid);
   let totalScore = 0;
+  const mergeEvents: MergeEvent[] = [];
 
   // eslint-disable-next-line no-constant-condition
   while (true) {
@@ -203,11 +190,18 @@ export function stabilize(grid: Grid): StabilizeResult {
     if (merges.length === 0) break;
 
     const selected = selectOneMerge(merges);
-    totalScore += applySingleMerge(newGrid, selected);
+    const score = applySingleMerge(newGrid, selected);
+    totalScore += score;
+    mergeEvents.push({
+      positions: selected.positions.map(pos => ({ ...pos })),
+      sum: selected.sum,
+      score,
+      placeAt: { ...selected.placeAt },
+    });
     applyGravity(newGrid);
   }
 
-  return { grid: newGrid, scoreGained: totalScore };
+  return { grid: newGrid, scoreGained: totalScore, mergeEvents };
 }
 
 // 檢查遊戲結束：頂部行（y=0）有任何方塊
