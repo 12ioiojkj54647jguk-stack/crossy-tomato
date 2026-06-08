@@ -1108,7 +1108,7 @@ export default function Game() {
             )}
           </div>
 
-          {/* 4. Achievements */}
+          {/* 4. Achievements - 只顯示前 8 個 */}
           <div
             className="panel-card cursor-pointer"
             onClick={() => setShowAchievements(true)}
@@ -1119,8 +1119,8 @@ export default function Game() {
                 {unlockedAchievements.length}/{ACHIEVEMENTS.length}
               </div>
             </div>
-            <div className="flex flex-wrap gap-1.5">
-              {ACHIEVEMENTS.map((a) => (
+            <div className="grid grid-cols-4 gap-1.5">
+              {ACHIEVEMENTS.slice(0, 8).map((a) => (
                 <div
                   key={a.id}
                   className="w-[28px] h-[28px] flex items-center justify-center rounded-lg transition-all duration-200"
