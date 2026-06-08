@@ -1289,28 +1289,37 @@ export default function Game() {
         </div>
       </div>
 
-      {/* Achievements Modal */}
+      {/* Achievements Full Page */}
       {showAchievements && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: "rgba(0,0,0,0.5)" }}>
-          <div className="bg-white rounded-2xl p-6 max-w-[600px] w-full mx-4 max-h-[80vh] overflow-y-auto" style={{ boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }}>
-            {/* Header */}
-            <div className="flex justify-between items-center mb-6">
-              <div>
-                <h2 className="text-[20px] font-semibold text-[#111111]">成就圖鑑</h2>
-                <p className="text-[12px] text-[#787774]">已解鎖 {unlockedAchievements.length}/{ACHIEVEMENTS.length}</p>
+        <div className="fixed inset-0 z-50 bg-white overflow-y-auto">
+          {/* Header - Sticky */}
+          <div className="sticky top-0 z-10 bg-white border-b border-[#EAEAEA]">
+            <div className="max-w-[760px] mx-auto px-4 py-4 flex items-center justify-between">
+              <div className="flex items-center gap-4">
+                <button
+                  onClick={() => setShowAchievements(false)}
+                  className="flex items-center gap-2 text-[#787774] hover:text-[#111111] transition-colors"
+                >
+                  <span className="text-[18px]">←</span>
+                  <span className="text-[14px] font-medium">返回遊戲</span>
+                </button>
               </div>
-              <button onClick={() => setShowAchievements(false)} className="w-[32px] h-[32px] flex items-center justify-center rounded-lg hover:bg-[#F7F6F3] transition-colors text-[#787774] hover:text-[#111111]">
-                ✕
-              </button>
+              <div className="text-[16px] font-semibold text-[#111111]">成就圖鑑</div>
+              <div className="text-[12px] text-[#787774]">
+                {unlockedAchievements.length}/{ACHIEVEMENTS.length} 已解鎖
+              </div>
             </div>
+          </div>
 
+          {/* Content */}
+          <div className="max-w-[760px] mx-auto px-4 py-8">
             {/* Progress Overview */}
-            <div className="mb-6 p-4 rounded-xl" style={{ background: "linear-gradient(135deg, #FBF3DB, #F5E6C8)", border: "1px solid #E5D4A5" }}>
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-[12px] font-semibold text-[#111111]">整體進度</span>
-                <span className="text-[12px] font-semibold text-[#956400]">{Math.round((unlockedAchievements.length / ACHIEVEMENTS.length) * 100)}%</span>
+            <div className="mb-8 p-6 rounded-2xl" style={{ background: "linear-gradient(135deg, #FBF3DB, #F5E6C8)", border: "1px solid #E5D4A5" }}>
+              <div className="flex items-center justify-between mb-3">
+                <span className="text-[16px] font-semibold text-[#111111]">整體進度</span>
+                <span className="text-[20px] font-bold text-[#956400]">{Math.round((unlockedAchievements.length / ACHIEVEMENTS.length) * 100)}%</span>
               </div>
-              <div className="h-[8px] rounded-full overflow-hidden" style={{ background: "rgba(255,255,255,0.5)" }}>
+              <div className="h-[12px] rounded-full overflow-hidden" style={{ background: "rgba(255,255,255,0.5)" }}>
                 <div
                   className="h-full rounded-full transition-all duration-500"
                   style={{
@@ -1319,10 +1328,13 @@ export default function Game() {
                   }}
                 />
               </div>
+              <div className="text-[12px] text-[#787774] mt-2">
+                已解鎖 {unlockedAchievements.length} 個成就，還有 {ACHIEVEMENTS.length - unlockedAchievements.length} 個等待挑戰
+              </div>
             </div>
 
             {/* Grid */}
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
               {ACHIEVEMENTS.map((achievement) => {
                 const isUnlocked = unlockedAchievements.includes(achievement.id);
                 const currentProgress = achievement.progress(stats);
@@ -1331,40 +1343,44 @@ export default function Game() {
                 return (
                   <div
                     key={achievement.id}
-                    className="rounded-xl p-4 transition-all"
+                    className="rounded-2xl p-5 transition-all hover:scale-[1.02]"
                     style={{
                       background: isUnlocked ? "linear-gradient(135deg, #FBF3DB, #F5E6C8)" : "#F7F6F3",
-                      border: `1px solid ${isUnlocked ? "#E5D4A5" : "#EAEAEA"}`,
+                      border: `2px solid ${isUnlocked ? "#E5D4A5" : "#EAEAEA"}`,
                       opacity: isUnlocked ? 1 : 0.6,
+                      boxShadow: isUnlocked ? "0 4px 12px rgba(149, 100, 0, 0.1)" : "none",
                     }}
                   >
-                    <div className="flex items-start gap-3">
+                    <div className="flex flex-col items-center text-center">
                       <div
-                        className="w-[48px] h-[48px] flex items-center justify-center rounded-lg text-[24px] shrink-0"
+                        className="w-[64px] h-[64px] flex items-center justify-center rounded-xl text-[32px] mb-3"
                         style={{
                           background: isUnlocked ? "rgba(255,255,255,0.5)" : "rgba(0,0,0,0.05)",
                         }}
                       >
                         {isUnlocked ? achievement.icon : "🔒"}
                       </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="text-[14px] font-semibold text-[#111111] truncate">{achievement.name}</div>
-                        <div className="text-[11px] text-[#787774] mb-2 line-clamp-2">{achievement.description}</div>
+                      <div className="text-[15px] font-semibold text-[#111111] mb-1">{achievement.name}</div>
+                      <div className="text-[12px] text-[#787774] mb-3 leading-relaxed">{achievement.description}</div>
 
-                        {/* Progress Bar */}
-                        <div className="h-[4px] rounded-full overflow-hidden" style={{ background: "#EAEAEA" }}>
-                          <div
-                            className="h-full rounded-full transition-all duration-300"
-                            style={{
-                              width: `${progressPercent}%`,
-                              background: isUnlocked ? "linear-gradient(90deg, #956400, #D4A574)" : "#AAA",
-                            }}
-                          />
-                        </div>
-                        <div className="text-[10px] text-[#787774] mt-1 tabular-nums">
-                          {currentProgress.toLocaleString()}/{achievement.target.toLocaleString()}
-                        </div>
+                      {/* Progress Bar */}
+                      <div className="w-full h-[6px] rounded-full overflow-hidden" style={{ background: "#EAEAEA" }}>
+                        <div
+                          className="h-full rounded-full transition-all duration-300"
+                          style={{
+                            width: `${progressPercent}%`,
+                            background: isUnlocked ? "linear-gradient(90deg, #956400, #D4A574)" : "#AAA",
+                          }}
+                        />
                       </div>
+                      <div className="text-[11px] text-[#787774] mt-2 tabular-nums">
+                        {currentProgress.toLocaleString()}/{achievement.target.toLocaleString()}
+                      </div>
+                      {isUnlocked && (
+                        <div className="mt-2 text-[10px] font-semibold text-[#956400] uppercase tracking-wider">
+                          已解鎖 ✓
+                        </div>
+                      )}
                     </div>
                   </div>
                 );
