@@ -975,8 +975,8 @@ export default function Game() {
         </div>
       )}
 
-      {/* Header - Title + Level + Score */}
-      <div className="flex w-full max-w-[760px] items-center justify-between gap-4">
+      {/* Header - Title + Achievement Button */}
+      <div className="flex w-full max-w-[760px] items-center justify-between">
         <div className="flex items-center gap-4">
           <div className="flex flex-col">
             <h1 className="text-[22px] font-semibold tracking-[-0.02em] text-[#111111]">数字消除方块</h1>
@@ -994,65 +994,65 @@ export default function Game() {
             </span>
           </button>
         </div>
-        
-        {/* Level Progress - Center */}
-        <div className="flex-1 max-w-[300px] px-4">
-          <div className="flex justify-between items-center mb-1">
-            <div className="text-[10px] uppercase tracking-[0.08em] text-[#787774] font-medium">Lv.{level}</div>
-            <div className="text-[10px] text-[#787774] tabular-nums">{experience} / {nextLevelExp}</div>
-          </div>
-          <div className="relative h-[8px] rounded-full overflow-hidden" style={{ background: "#F0F0F0" }}>
-            <div
-              className="h-full rounded-full transition-all duration-500 ease-out"
-              style={{
-                width: `${Math.min(expProgress, 100)}%`,
-                background: "linear-gradient(90deg, #956400, #D4A574)",
-              }}
-            />
-            {expProgress > 0 && (
-              <div 
-                className="absolute top-0 h-full w-[30%] rounded-full"
-                style={{
-                  background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent)",
-                  animation: "progressShine 2s ease-in-out infinite",
-                }}
-              />
-            )}
-          </div>
-        </div>
-
-        {/* Score - Right */}
-        <div className="flex flex-col items-end">
-          <div className="text-[10px] uppercase tracking-[0.08em] text-[#787774] font-medium">得分</div>
-          <div 
-            className="text-[28px] font-bold tracking-[-0.03em] tabular-nums transition-all duration-200"
-            style={{ 
-              color: combo > 0 ? "#9F2F2D" : "#111111",
-            }}
-          >
-            {score}
-          </div>
-          {combo > 0 && !gameOver && (
-            <div 
-              className="text-[11px] font-semibold px-2 py-0.5 mt-1"
-              style={{ 
-                background: "linear-gradient(135deg, #FDEBEC, #FFE8E0)", 
-                color: "#9F2F2D", 
-                borderRadius: "4px",
-                animation: "comboFlash 1s ease-in-out infinite",
-              }}
-            >
-              🔥 连击 ×{combo}
-            </div>
-          )}
-        </div>
       </div>
 
       {/* Main Content - Left Sidebar + Canvas + Right Sidebar */}
       <div className="flex w-full max-w-[760px] items-start justify-center gap-4">
-        {/* Left Sidebar - Stats & Achievements */}
+        {/* Left Sidebar - Score + Level + Stats & Achievements */}
         <aside className="flex w-[180px] shrink-0 flex-col gap-3">
-          {/* Statistics */}
+          {/* 1. Score */}
+          <div className="panel-card">
+            <div className="text-[10px] uppercase tracking-[0.08em] text-[#787774] mb-1 font-medium">得分</div>
+            <div
+              className="text-[28px] font-bold tracking-[-0.03em] tabular-nums transition-all duration-200"
+              style={{
+                color: combo > 0 ? "#9F2F2D" : "#111111",
+              }}
+            >
+              {score}
+            </div>
+            {combo > 0 && !gameOver && (
+              <div
+                className="text-[11px] font-semibold px-2 py-0.5 mt-1 inline-block"
+                style={{
+                  background: "linear-gradient(135deg, #FDEBEC, #FFE8E0)",
+                  color: "#9F2F2D",
+                  borderRadius: "4px",
+                  animation: "comboFlash 1s ease-in-out infinite",
+                }}
+              >
+                🔥 连击 ×{combo}
+              </div>
+            )}
+          </div>
+
+          {/* 2. Level Progress */}
+          <div className="panel-card">
+            <div className="flex justify-between items-center mb-2">
+              <div className="text-[10px] uppercase tracking-[0.08em] text-[#787774] font-medium">Lv.{level}</div>
+              <div className="text-[10px] text-[#787774] tabular-nums">{experience} / {nextLevelExp}</div>
+            </div>
+            <div className="relative h-[8px] rounded-full overflow-hidden" style={{ background: "#F0F0F0" }}>
+              <div
+                className="h-full rounded-full transition-all duration-500 ease-out"
+                style={{
+                  width: `${Math.min(expProgress, 100)}%`,
+                  background: "linear-gradient(90deg, #956400, #D4A574)",
+                }}
+              />
+              {expProgress > 0 && (
+                <div
+                  className="absolute top-0 h-full w-[30%] rounded-full"
+                  style={{
+                    background: "linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent)",
+                    animation: "progressShine 2s ease-in-out infinite",
+                  }}
+                />
+              )}
+            </div>
+          </div>
+
+          {/* 3. Statistics */}
           <div
             className="panel-card cursor-pointer"
             style={{ background: showStats ? "#F7F6F3" : "#FFFFFF" }}
@@ -1082,7 +1082,7 @@ export default function Game() {
             )}
           </div>
 
-          {/* Achievements */}
+          {/* 4. Achievements */}
           <div
             className="panel-card cursor-pointer"
             onClick={() => setShowAchievements(true)}
