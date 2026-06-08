@@ -39,102 +39,97 @@ interface Achievement {
   name: string;
   description: string;
   icon: string;
+  category: string;
   condition: (stats: GameStats) => boolean;
   progress: (stats: GameStats) => number;
   target: number;
 }
 
 const ACHIEVEMENTS: Achievement[] = [
-  {
-    id: "first_merge",
-    name: "初次合并",
-    description: "完成第一次合并",
-    icon: "⭐",
-    condition: (s) => s.totalMerges >= 1,
-    progress: (s) => Math.min(s.totalMerges, 1),
-    target: 1,
-  },
-  {
-    id: "score_100",
-    name: "百分达人",
-    description: "单局得分达到 100",
-    icon: "💯",
-    condition: (s) => s.score >= 100,
-    progress: (s) => Math.min(s.score, 100),
-    target: 100,
-  },
-  {
-    id: "score_500",
-    name: "高分玩家",
-    description: "单局得分达到 500",
-    icon: "🏆",
-    condition: (s) => s.score >= 500,
-    progress: (s) => Math.min(s.score, 500),
-    target: 500,
-  },
-  {
-    id: "score_1000",
-    name: "千分大师",
-    description: "单局得分达到 1000",
-    icon: "👑",
-    condition: (s) => s.score >= 1000,
-    progress: (s) => Math.min(s.score, 1000),
-    target: 1000,
-  },
-  {
-    id: "combo_3",
-    name: "连击新手",
-    description: "达成 3 连击",
-    icon: "🔥",
-    condition: (s) => s.maxCombo >= 3,
-    progress: (s) => Math.min(s.maxCombo, 3),
-    target: 3,
-  },
-  {
-    id: "combo_5",
-    name: "连击达人",
-    description: "达成 5 连击",
-    icon: "🔥🔥",
-    condition: (s) => s.maxCombo >= 5,
-    progress: (s) => Math.min(s.maxCombo, 5),
-    target: 5,
-  },
-  {
-    id: "merge_5",
-    name: "合并大师",
-    description: "单次合并 5 个方块",
-    icon: "💎",
-    condition: (s) => s.biggestMerge >= 5,
-    progress: (s) => Math.min(s.biggestMerge, 5),
-    target: 5,
-  },
-  {
-    id: "level_5",
-    name: "等级提升",
-    description: "达到 5 级",
-    icon: "📈",
-    condition: (s) => s.level >= 5,
-    progress: (s) => Math.min(s.level, 5),
-    target: 5,
-  },
-  {
-    id: "pieces_50",
-    name: "坚持不懈",
-    description: "放置 50 个方块",
-    icon: "💪",
-    condition: (s) => s.totalPieces >= 50,
-    progress: (s) => Math.min(s.totalPieces, 50),
-    target: 50,
-  },
-  {
-    id: "play_5min",
-    name: "持久战",
-    description: "单局游戏超过 5 分钟",
-    icon: "⏱️",
-    condition: (s) => s.gameTime >= 300,
-    progress: (s) => Math.min(s.gameTime, 300),
-    target: 300,
-  },
+  // 分數相關（14個）
+  { id: "first_merge", name: "初次合并", description: "完成第一次合并", icon: "⭐", category: "分數", condition: (s) => s.totalMerges >= 1, progress: (s) => Math.min(s.totalMerges, 1), target: 1 },
+  { id: "score_100", name: "百分达人", description: "单局得分达到 100", icon: "💯", category: "分數", condition: (s) => s.score >= 100, progress: (s) => Math.min(s.score, 100), target: 100 },
+  { id: "score_500", name: "高分玩家", description: "单局得分达到 500", icon: "🏆", category: "分數", condition: (s) => s.score >= 500, progress: (s) => Math.min(s.score, 500), target: 500 },
+  { id: "score_1000", name: "千分大师", description: "单局得分达到 1000", icon: "👑", category: "分數", condition: (s) => s.score >= 1000, progress: (s) => Math.min(s.score, 1000), target: 1000 },
+  { id: "score_2000", name: "分數製造機", description: "单局得分达到 2,000", icon: "🏭", category: "分數", condition: (s) => s.score >= 2000, progress: (s) => Math.min(s.score, 2000), target: 2000 },
+  { id: "score_5000", name: "分數收割者", description: "单局得分达到 5,000", icon: "🎯", category: "分數", condition: (s) => s.score >= 5000, progress: (s) => Math.min(s.score, 5000), target: 5000 },
+  { id: "score_7500", name: "萬分預備軍", description: "单局得分达到 7,500", icon: "🎖️", category: "分數", condition: (s) => s.score >= 7500, progress: (s) => Math.min(s.score, 7500), target: 7500 },
+  { id: "score_10000", name: "万分至尊", description: "单局得分达到 10,000", icon: "💎", category: "分數", condition: (s) => s.score >= 10000, progress: (s) => Math.min(s.score, 10000), target: 10000 },
+  { id: "score_15000", name: "單局巔峰", description: "单局得分达到 15,000", icon: "🔝", category: "分數", condition: (s) => s.score >= 15000, progress: (s) => Math.min(s.score, 15000), target: 15000 },
+  { id: "total_score_10000", name: "百分專家", description: "累计得分达到 10,000", icon: "📊", category: "分數", condition: (s) => s.totalScore >= 10000, progress: (s) => Math.min(s.totalScore, 10000), target: 10000 },
+  { id: "total_score_50000", name: "分數達人", description: "累计得分达到 50,000", icon: "🌟", category: "分數", condition: (s) => s.totalScore >= 50000, progress: (s) => Math.min(s.totalScore, 50000), target: 50000 },
+  { id: "total_score_100000", name: "分數之王", description: "累计得分达到 100,000", icon: "👑", category: "分數", condition: (s) => s.totalScore >= 100000, progress: (s) => Math.min(s.totalScore, 100000), target: 100000 },
+  { id: "total_score_500000", name: "分數永恆", description: "累计得分达到 500,000", icon: "♾️", category: "分數", condition: (s) => s.totalScore >= 500000, progress: (s) => Math.min(s.totalScore, 500000), target: 500000 },
+  { id: "single_merge_500", name: "分數爆發", description: "單次合并獲得 500+ 分", icon: "💥", category: "分數", condition: (s) => s.singleMergeMaxScore >= 500, progress: (s) => Math.min(s.singleMergeMaxScore, 500), target: 500 },
+
+  // 連擊相關（8個）
+  { id: "combo_3", name: "连击新手", description: "达成 3 连击", icon: "🔥", category: "連擊", condition: (s) => s.maxCombo >= 3, progress: (s) => Math.min(s.maxCombo, 3), target: 3 },
+  { id: "combo_5", name: "连击达人", description: "达成 5 连击", icon: "🔥🔥", category: "連擊", condition: (s) => s.maxCombo >= 5, progress: (s) => Math.min(s.maxCombo, 5), target: 5 },
+  { id: "combo_7", name: "連擊新手 II", description: "達成 7 連擊", icon: "🔥🔥", category: "連擊", condition: (s) => s.maxCombo >= 7, progress: (s) => Math.min(s.maxCombo, 7), target: 7 },
+  { id: "combo_10", name: "連擊狂人", description: "達成 10 連擊", icon: "⚡", category: "連擊", condition: (s) => s.maxCombo >= 10, progress: (s) => Math.min(s.maxCombo, 10), target: 10 },
+  { id: "combo_15", name: "連擊之王", description: "達成 15 連擊", icon: "👑", category: "連擊", condition: (s) => s.maxCombo >= 15, progress: (s) => Math.min(s.maxCombo, 15), target: 15 },
+  { id: "combo_20", name: "連擊宗師", description: "達成 20 連擊", icon: "🌋", category: "連擊", condition: (s) => s.maxCombo >= 20, progress: (s) => Math.min(s.maxCombo, 20), target: 20 },
+  { id: "combo_25", name: "連擊之神", description: "達成 25 連擊", icon: "⚡⚡", category: "連擊", condition: (s) => s.maxCombo >= 25, progress: (s) => Math.min(s.maxCombo, 25), target: 25 },
+  { id: "combo_30", name: "無限連擊", description: "達成 30 連擊", icon: "♾️", category: "連擊", condition: (s) => s.maxCombo >= 30, progress: (s) => Math.min(s.maxCombo, 30), target: 30 },
+
+  // 合併相關（8個）
+  { id: "merge_5", name: "合并大师", description: "单次合并 5 個方块", icon: "💎", category: "合併", condition: (s) => s.biggestMerge >= 5, progress: (s) => Math.min(s.biggestMerge, 5), target: 5 },
+  { id: "merge_8", name: "合併達人", description: "单次合并 8 個方块", icon: "🎯", category: "合併", condition: (s) => s.biggestMerge >= 8, progress: (s) => Math.min(s.biggestMerge, 8), target: 8 },
+  { id: "merge_10", name: "合併專家", description: "单次合并 10 個方块", icon: "🔧", category: "合併", condition: (s) => s.biggestMerge >= 10, progress: (s) => Math.min(s.biggestMerge, 10), target: 10 },
+  { id: "merge_15", name: "合併宗師", description: "单次合并 15 個方块", icon: "🏅", category: "合併", condition: (s) => s.biggestMerge >= 15, progress: (s) => Math.min(s.biggestMerge, 15), target: 15 },
+  { id: "merge_20", name: "合併之王", description: "单次合并 20 個方块", icon: "👑", category: "合併", condition: (s) => s.biggestMerge >= 20, progress: (s) => Math.min(s.biggestMerge, 20), target: 20 },
+  { id: "merge_25", name: "合併極限", description: "单次合并 25 個方块", icon: "💎", category: "合併", condition: (s) => s.biggestMerge >= 25, progress: (s) => Math.min(s.biggestMerge, 25), target: 25 },
+  { id: "merge_30", name: "合併永恆", description: "單次合并 30 個方块", icon: "♾️", category: "合併", condition: (s) => s.biggestMerge >= 30, progress: (s) => Math.min(s.biggestMerge, 30), target: 30 },
+  { id: "number_100", name: "巨大化", description: "合并出 100 以上的數字", icon: "📐", category: "合併", condition: (s) => s.maxNumberCreated >= 100, progress: (s) => Math.min(s.maxNumberCreated, 100), target: 100 },
+
+  // 等級相關（7個）
+  { id: "level_3", name: "等級見習生", description: "达到 3 級", icon: "📚", category: "等級", condition: (s) => s.level >= 3, progress: (s) => Math.min(s.level, 3), target: 3 },
+  { id: "level_5", name: "等级提升", description: "达到 5 级", icon: "📈", category: "等級", condition: (s) => s.level >= 5, progress: (s) => Math.min(s.level, 5), target: 5 },
+  { id: "level_10", name: "等級達人", description: "达到 10 級", icon: "🎖️", category: "等級", condition: (s) => s.level >= 10, progress: (s) => Math.min(s.level, 10), target: 10 },
+  { id: "level_15", name: "等級大師", description: "达到 15 級", icon: "🏆", category: "等級", condition: (s) => s.level >= 15, progress: (s) => Math.min(s.level, 15), target: 15 },
+  { id: "level_20", name: "最高等級", description: "达到 20 級", icon: "👑", category: "等級", condition: (s) => s.level >= 20, progress: (s) => Math.min(s.level, 20), target: 20 },
+  { id: "level_25", name: "等級精英", description: "达到 25 級", icon: "⚔️", category: "等級", condition: (s) => s.level >= 25, progress: (s) => Math.min(s.level, 25), target: 25 },
+  { id: "level_30", name: "等級傳說", description: "达到 30 級", icon: "🌟", category: "等級", condition: (s) => s.level >= 30, progress: (s) => Math.min(s.level, 30), target: 30 },
+
+  // 方塊放置相關（7個）
+  { id: "pieces_25", name: "方块新手", description: "放置 25 個方块", icon: "🆕", category: "方塊", condition: (s) => s.totalPieces >= 25, progress: (s) => Math.min(s.totalPieces, 25), target: 25 },
+  { id: "pieces_50", name: "坚持不懈", description: "放置 50 個方块", icon: "💪", category: "方塊", condition: (s) => s.totalPieces >= 50, progress: (s) => Math.min(s.totalPieces, 50), target: 50 },
+  { id: "pieces_100", name: "方块达人", description: "放置 100 個方块", icon: "🧱", category: "方塊", condition: (s) => s.totalPieces >= 100, progress: (s) => Math.min(s.totalPieces, 100), target: 100 },
+  { id: "pieces_250", name: "方块收集者", description: "放置 250 個方块", icon: "🎒", category: "方塊", condition: (s) => s.totalPieces >= 250, progress: (s) => Math.min(s.totalPieces, 250), target: 250 },
+  { id: "pieces_500", name: "方块大師", description: "放置 500 個方块", icon: "🏗️", category: "方塊", condition: (s) => s.totalPieces >= 500, progress: (s) => Math.min(s.totalPieces, 500), target: 500 },
+  { id: "pieces_1000", name: "方块狂人", description: "放置 1,000 個方块", icon: "📦", category: "方塊", condition: (s) => s.totalPieces >= 1000, progress: (s) => Math.min(s.totalPieces, 1000), target: 1000 },
+  { id: "pieces_2500", name: "方塊永恆", description: "放置 2,500 個方块", icon: "♾️", category: "方塊", condition: (s) => s.totalPieces >= 2500, progress: (s) => Math.min(s.totalPieces, 2500), target: 2500 },
+
+  // 時間相關（5個）
+  { id: "play_1min_100", name: "快速閃現", description: "在 1 分鐘內獲得 100 分", icon: "⚡", category: "時間", condition: (s) => s.gameTime >= 60 && s.score >= 100, progress: (s) => s.gameTime >= 60 ? Math.min(s.score, 100) : 0, target: 100 },
+  { id: "play_5min", name: "持久战", description: "单局游戏超过 5 分钟", icon: "⏱️", category: "時間", condition: (s) => s.gameTime >= 300, progress: (s) => Math.min(s.gameTime, 300), target: 300 },
+  { id: "play_8min", name: "耐心大師", description: "单局游戏超過 8 分鐘", icon: "🧘", category: "時間", condition: (s) => s.gameTime >= 480, progress: (s) => Math.min(s.gameTime, 480), target: 480 },
+  { id: "play_15min", name: "時間管理大師", description: "单局游戏超過 15 分鐘", icon: "⏰", category: "時間", condition: (s) => s.gameTime >= 900, progress: (s) => Math.min(s.gameTime, 900), target: 900 },
+  { id: "play_20min", name: "時間飛逝", description: "单局游戏超過 20 分鐘", icon: "⏳", category: "時間", condition: (s) => s.gameTime >= 1200, progress: (s) => Math.min(s.gameTime, 1200), target: 1200 },
+  { id: "play_30min", name: "時間永恆", description: "单局游戏超過 30 分鐘", icon: "♾️", category: "時間", condition: (s) => s.gameTime >= 1800, progress: (s) => Math.min(s.gameTime, 1800), target: 1800 },
+
+  // 遊戲風格相關（6個）
+  { id: "speed_3min_500", name: "速度選手", description: "在 3 分钟内获得 500 分", icon: "🏃", category: "風格", condition: (s) => s.gameTime <= 180 && s.score >= 500, progress: (s) => s.gameTime <= 180 ? Math.min(s.score, 500) : 0, target: 500 },
+  { id: "slow_10min", name: "慢工出細活", description: "单局游戏超過 10 分鐘", icon: "🐢", category: "風格", condition: (s) => s.gameTime >= 600, progress: (s) => Math.min(s.gameTime, 600), target: 600 },
+  { id: "avg_50", name: "效率大師", description: "平均每塊得分超過 50 分", icon: "📈", category: "風格", condition: (s) => s.totalPieces > 0 && s.score / s.totalPieces >= 50, progress: (s) => s.totalPieces > 0 ? Math.min(Math.floor(s.score / s.totalPieces), 50) : 0, target: 50 },
+  { id: "top3_empty", name: "完美主義者", description: "游戏結束時顶部 3 行全空", icon: "✨", category: "風格", condition: (s) => s.topRowsEmpty >= 3, progress: (s) => Math.min(s.topRowsEmpty, 3), target: 3 },
+  { id: "top5_empty", name: "完美收官", description: "游戏結束時頂部 5 行全空", icon: "🎯", category: "風格", condition: (s) => s.topRowsEmpty >= 5, progress: (s) => Math.min(s.topRowsEmpty, 5), target: 5 },
+  { id: "survivor", name: "幸存者", description: "在方塊幾乎填滿時成功存活並合并", icon: "🛡️", category: "風格", condition: (s) => s.totalMerges >= 50 && s.biggestMerge >= 10, progress: (s) => Math.min(s.totalMerges, 50), target: 50 },
+
+  // 合併數字相關（4個）
+  { id: "number_50", name: "數字創造者", description: "合并出 50 以上的數字", icon: "🔢", category: "數字", condition: (s) => s.maxNumberCreated >= 50, progress: (s) => Math.min(s.maxNumberCreated, 50), target: 50 },
+  { id: "number_200", name: "數字大師", description: "合并出 200 以上的數字", icon: "🎲", category: "數字", condition: (s) => s.maxNumberCreated >= 200, progress: (s) => Math.min(s.maxNumberCreated, 200), target: 200 },
+  { id: "number_500", name: "數字之王", description: "合并出 500 以上的數字", icon: "👑", category: "數字", condition: (s) => s.maxNumberCreated >= 500, progress: (s) => Math.min(s.maxNumberCreated, 500), target: 500 },
+  { id: "number_1000", name: "數字極限", description: "合并出 1,000 以上的數字", icon: "💎", category: "數字", condition: (s) => s.maxNumberCreated >= 1000, progress: (s) => Math.min(s.maxNumberCreated, 1000), target: 1000 },
+  { id: "number_2000", name: "數字永恆", description: "合并出 2,000 以上的數字", icon: "♾️", category: "數字", condition: (s) => s.maxNumberCreated >= 2000, progress: (s) => Math.min(s.maxNumberCreated, 2000), target: 2000 },
+
+  // 特殊成就（6個）
+  { id: "first_game_200", name: "新手運", description: "第一次游玩就獲得 200+ 分", icon: "🍀", category: "特殊", condition: (s) => s.totalGames === 1 && s.score >= 200, progress: (s) => s.totalGames === 1 ? Math.min(s.score, 200) : 0, target: 200 },
+  { id: "undo_500", name: "東山再起", description: "使用撤销 5 次後獲得 500+ 分", icon: "🔄", category: "特殊", condition: (s) => s.score >= 500, progress: (s) => Math.min(s.score, 500), target: 500 },
+  { id: "games_5", name: "挑戰者", description: "連續游玩 5 局", icon: "🎮", category: "特殊", condition: (s) => s.totalGames >= 5, progress: (s) => Math.min(s.totalGames, 5), target: 5 },
+  { id: "games_10", name: "勤勞蜜蜂", description: "連續游玩 10 局", icon: "🐝", category: "特殊", condition: (s) => s.totalGames >= 10, progress: (s) => Math.min(s.totalGames, 10), target: 10 },
+  { id: "games_50", name: "遊戲愛好者", description: "累计游玩 50 局", icon: "💫", category: "特殊", condition: (s) => s.totalGames >= 50, progress: (s) => Math.min(s.totalGames, 50), target: 50 },
+  { id: "games_100", name: "遊戲大師", description: "累计游玩 100 局", icon: "👑", category: "特殊", condition: (s) => s.totalGames >= 100, progress: (s) => Math.min(s.totalGames, 100), target: 100 },
 ];
 
 // Game statistics
@@ -147,6 +142,16 @@ interface GameStats {
   totalPieces: number;
   biggestMerge: number;
   gameTime: number;
+  // 新增
+  totalScore: number;
+  totalGames: number;
+  highestScore: number;
+  singleMergeMaxScore: number;
+  maxNumberCreated: number;
+  consecutiveMerges: number;
+  maxConsecutiveMerges: number;
+  mergesWithoutPiece: number;
+  topRowsEmpty: number;
 }
 
 interface GameSummary {
@@ -167,6 +172,16 @@ const initialStats: GameStats = {
   totalPieces: 0,
   biggestMerge: 0,
   gameTime: 0,
+  // 新增
+  totalScore: 0,
+  totalGames: 0,
+  highestScore: 0,
+  singleMergeMaxScore: 0,
+  maxNumberCreated: 0,
+  consecutiveMerges: 0,
+  maxConsecutiveMerges: 0,
+  mergesWithoutPiece: 0,
+  topRowsEmpty: 0,
 };
 
 function getLevel(exp: number): number {
@@ -416,6 +431,8 @@ export default function Game() {
         level: levelRef.current,
         totalPieces: currentStats.totalPieces + 1,
         gameTime: Math.floor((Date.now() - gameStartTimeRef.current) / 1000),
+        totalScore: currentStats.totalScore + scoreRef.current,
+        highestScore: Math.max(currentStats.highestScore, scoreRef.current),
       };
       updateStats(nextStats);
       finishGame(scoreRef.current, nextStats);
@@ -456,6 +473,15 @@ export default function Game() {
       totalPieces: currentStats.totalPieces + 1,
       biggestMerge: Math.max(currentStats.biggestMerge, biggestMergeThisTurn),
       gameTime: Math.floor((Date.now() - gameStartTimeRef.current) / 1000),
+      totalScore: currentStats.totalScore + finalScore,
+      highestScore: Math.max(currentStats.highestScore, newScore),
+      singleMergeMaxScore: Math.max(currentStats.singleMergeMaxScore, finalScore),
+      maxNumberCreated: Math.max(currentStats.maxNumberCreated, ...result.mergeEvents.flatMap(e => e.positions.map(p => newGrid[p.y]?.[p.x] || 0))),
+      consecutiveMerges: mergeCount > 0 ? currentStats.consecutiveMerges + mergeCount : 0,
+      maxConsecutiveMerges: Math.max(currentStats.maxConsecutiveMerges, mergeCount > 0 ? currentStats.consecutiveMerges + mergeCount : 0),
+      totalGames: currentStats.totalGames,
+      mergesWithoutPiece: currentStats.mergesWithoutPiece,
+      topRowsEmpty: currentStats.topRowsEmpty,
     };
 
     updateStats(nextStats);
