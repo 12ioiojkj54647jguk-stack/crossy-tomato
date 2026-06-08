@@ -40,6 +40,8 @@ interface Achievement {
   description: string;
   icon: string;
   condition: (stats: GameStats) => boolean;
+  progress: (stats: GameStats) => number;
+  target: number;
 }
 
 const ACHIEVEMENTS: Achievement[] = [
@@ -49,6 +51,8 @@ const ACHIEVEMENTS: Achievement[] = [
     description: "完成第一次合并",
     icon: "⭐",
     condition: (s) => s.totalMerges >= 1,
+    progress: (s) => Math.min(s.totalMerges, 1),
+    target: 1,
   },
   {
     id: "score_100",
@@ -56,6 +60,8 @@ const ACHIEVEMENTS: Achievement[] = [
     description: "单局得分达到 100",
     icon: "💯",
     condition: (s) => s.score >= 100,
+    progress: (s) => Math.min(s.score, 100),
+    target: 100,
   },
   {
     id: "score_500",
@@ -63,6 +69,8 @@ const ACHIEVEMENTS: Achievement[] = [
     description: "单局得分达到 500",
     icon: "🏆",
     condition: (s) => s.score >= 500,
+    progress: (s) => Math.min(s.score, 500),
+    target: 500,
   },
   {
     id: "score_1000",
@@ -70,6 +78,8 @@ const ACHIEVEMENTS: Achievement[] = [
     description: "单局得分达到 1000",
     icon: "👑",
     condition: (s) => s.score >= 1000,
+    progress: (s) => Math.min(s.score, 1000),
+    target: 1000,
   },
   {
     id: "combo_3",
@@ -77,6 +87,8 @@ const ACHIEVEMENTS: Achievement[] = [
     description: "达成 3 连击",
     icon: "🔥",
     condition: (s) => s.maxCombo >= 3,
+    progress: (s) => Math.min(s.maxCombo, 3),
+    target: 3,
   },
   {
     id: "combo_5",
@@ -84,6 +96,8 @@ const ACHIEVEMENTS: Achievement[] = [
     description: "达成 5 连击",
     icon: "🔥🔥",
     condition: (s) => s.maxCombo >= 5,
+    progress: (s) => Math.min(s.maxCombo, 5),
+    target: 5,
   },
   {
     id: "merge_5",
@@ -91,6 +105,8 @@ const ACHIEVEMENTS: Achievement[] = [
     description: "单次合并 5 个方块",
     icon: "💎",
     condition: (s) => s.biggestMerge >= 5,
+    progress: (s) => Math.min(s.biggestMerge, 5),
+    target: 5,
   },
   {
     id: "level_5",
@@ -98,6 +114,8 @@ const ACHIEVEMENTS: Achievement[] = [
     description: "达到 5 级",
     icon: "📈",
     condition: (s) => s.level >= 5,
+    progress: (s) => Math.min(s.level, 5),
+    target: 5,
   },
   {
     id: "pieces_50",
@@ -105,6 +123,8 @@ const ACHIEVEMENTS: Achievement[] = [
     description: "放置 50 个方块",
     icon: "💪",
     condition: (s) => s.totalPieces >= 50,
+    progress: (s) => Math.min(s.totalPieces, 50),
+    target: 50,
   },
   {
     id: "play_5min",
@@ -112,6 +132,8 @@ const ACHIEVEMENTS: Achievement[] = [
     description: "单局游戏超过 5 分钟",
     icon: "⏱️",
     condition: (s) => s.gameTime >= 300,
+    progress: (s) => Math.min(s.gameTime, 300),
+    target: 300,
   },
 ];
 
@@ -198,6 +220,7 @@ export default function Game() {
   // Achievements
   const [unlockedAchievements, setUnlockedAchievements] = useState<string[]>([]);
   const [achievementPopup, setAchievementPopup] = useState<Achievement | null>(null);
+  const [showAchievements, setShowAchievements] = useState(false);
 
   const gridRef = useRef(grid);
   const currentPieceRef = useRef(currentPiece);
@@ -954,9 +977,22 @@ export default function Game() {
 
       {/* Header - Title + Level + Score */}
       <div className="flex w-full max-w-[760px] items-center justify-between gap-4">
-        <div className="flex flex-col">
-          <h1 className="text-[22px] font-semibold tracking-[-0.02em] text-[#111111]">数字消除方块</h1>
-          <p className="text-[12px] text-[#787774] tracking-wide">相邻三个相同数字自动合并</p>
+        <div className="flex items-center gap-4">
+          <div className="flex flex-col">
+            <h1 className="text-[22px] font-semibold tracking-[-0.02em] text-[#111111]">数字消除方块</h1>
+            <p className="text-[12px] text-[#787774] tracking-wide">相邻三个相同数字自动合并</p>
+          </div>
+          <button
+            onClick={() => setShowAchievements(true)}
+            className="flex items-center gap-2 px-3 py-1.5 rounded-lg transition-all hover:bg-[#F7F6F3]"
+            style={{ border: "1px solid #E5E5E5" }}
+          >
+            <span className="text-[14px]">🏆</span>
+            <span className="text-[12px] font-medium text-[#111111]">成就</span>
+            <span className="text-[10px] px-1.5 py-0.5 rounded-full" style={{ background: "#F7F6F3", color: "#787774" }}>
+              {unlockedAchievements.length}/{ACHIEVEMENTS.length}
+            </span>
+          </button>
         </div>
         
         {/* Level Progress - Center */}
@@ -1047,7 +1083,10 @@ export default function Game() {
           </div>
 
           {/* Achievements */}
-          <div className="panel-card">
+          <div
+            className="panel-card cursor-pointer"
+            onClick={() => setShowAchievements(true)}
+          >
             <div className="flex justify-between items-center mb-3">
               <div className="text-[10px] uppercase tracking-[0.08em] text-[#787774] font-medium">成就</div>
               <div className="text-[10px] px-2 py-0.5 rounded-full" style={{ background: "#F7F6F3", color: "#787774" }}>
@@ -1066,15 +1105,16 @@ export default function Game() {
                     border: `1px solid ${unlockedAchievements.includes(a.id) ? "#E5D4A5" : "#EAEAEA"}`,
                     fontSize: "14px",
                     opacity: unlockedAchievements.includes(a.id) ? 1 : 0.4,
-                    cursor: "default",
+                    cursor: "pointer",
                     boxShadow: unlockedAchievements.includes(a.id) ? "0 2px 4px rgba(0,0,0,0.08)" : "none",
                   }}
-                  title={`${a.name}: ${a.description}`}
+                  title={a.name}
                 >
-                  {a.icon}
+                  {unlockedAchievements.includes(a.id) ? a.icon : "🔒"}
                 </div>
               ))}
             </div>
+            <div className="text-[10px] text-[#787774] mt-2 text-center">點擊查看完整圖鑑</div>
           </div>
         </aside>
 
@@ -1248,6 +1288,91 @@ export default function Game() {
           )}
         </div>
       </div>
+
+      {/* Achievements Modal */}
+      {showAchievements && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center" style={{ background: "rgba(0,0,0,0.5)" }}>
+          <div className="bg-white rounded-2xl p-6 max-w-[600px] w-full mx-4 max-h-[80vh] overflow-y-auto" style={{ boxShadow: "0 20px 60px rgba(0,0,0,0.2)" }}>
+            {/* Header */}
+            <div className="flex justify-between items-center mb-6">
+              <div>
+                <h2 className="text-[20px] font-semibold text-[#111111]">成就圖鑑</h2>
+                <p className="text-[12px] text-[#787774]">已解鎖 {unlockedAchievements.length}/{ACHIEVEMENTS.length}</p>
+              </div>
+              <button onClick={() => setShowAchievements(false)} className="w-[32px] h-[32px] flex items-center justify-center rounded-lg hover:bg-[#F7F6F3] transition-colors text-[#787774] hover:text-[#111111]">
+                ✕
+              </button>
+            </div>
+
+            {/* Progress Overview */}
+            <div className="mb-6 p-4 rounded-xl" style={{ background: "linear-gradient(135deg, #FBF3DB, #F5E6C8)", border: "1px solid #E5D4A5" }}>
+              <div className="flex items-center justify-between mb-2">
+                <span className="text-[12px] font-semibold text-[#111111]">整體進度</span>
+                <span className="text-[12px] font-semibold text-[#956400]">{Math.round((unlockedAchievements.length / ACHIEVEMENTS.length) * 100)}%</span>
+              </div>
+              <div className="h-[8px] rounded-full overflow-hidden" style={{ background: "rgba(255,255,255,0.5)" }}>
+                <div
+                  className="h-full rounded-full transition-all duration-500"
+                  style={{
+                    width: `${(unlockedAchievements.length / ACHIEVEMENTS.length) * 100}%`,
+                    background: "linear-gradient(90deg, #956400, #D4A574)",
+                  }}
+                />
+              </div>
+            </div>
+
+            {/* Grid */}
+            <div className="grid grid-cols-2 gap-4">
+              {ACHIEVEMENTS.map((achievement) => {
+                const isUnlocked = unlockedAchievements.includes(achievement.id);
+                const currentProgress = achievement.progress(stats);
+                const progressPercent = Math.min((currentProgress / achievement.target) * 100, 100);
+
+                return (
+                  <div
+                    key={achievement.id}
+                    className="rounded-xl p-4 transition-all"
+                    style={{
+                      background: isUnlocked ? "linear-gradient(135deg, #FBF3DB, #F5E6C8)" : "#F7F6F3",
+                      border: `1px solid ${isUnlocked ? "#E5D4A5" : "#EAEAEA"}`,
+                      opacity: isUnlocked ? 1 : 0.6,
+                    }}
+                  >
+                    <div className="flex items-start gap-3">
+                      <div
+                        className="w-[48px] h-[48px] flex items-center justify-center rounded-lg text-[24px] shrink-0"
+                        style={{
+                          background: isUnlocked ? "rgba(255,255,255,0.5)" : "rgba(0,0,0,0.05)",
+                        }}
+                      >
+                        {isUnlocked ? achievement.icon : "🔒"}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="text-[14px] font-semibold text-[#111111] truncate">{achievement.name}</div>
+                        <div className="text-[11px] text-[#787774] mb-2 line-clamp-2">{achievement.description}</div>
+
+                        {/* Progress Bar */}
+                        <div className="h-[4px] rounded-full overflow-hidden" style={{ background: "#EAEAEA" }}>
+                          <div
+                            className="h-full rounded-full transition-all duration-300"
+                            style={{
+                              width: `${progressPercent}%`,
+                              background: isUnlocked ? "linear-gradient(90deg, #956400, #D4A574)" : "#AAA",
+                            }}
+                          />
+                        </div>
+                        <div className="text-[10px] text-[#787774] mt-1 tabular-nums">
+                          {currentProgress.toLocaleString()}/{achievement.target.toLocaleString()}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
+      )}
     </main>
 
   );
