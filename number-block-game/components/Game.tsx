@@ -191,7 +191,10 @@ export default function Game() {
   // Statistics
   const [stats, setStats] = useState<GameStats>(initialStats);
   const [showStats, setShowStats] = useState(false);
-  
+
+  // Game Rules
+  const [showRules, setShowRules] = useState(false);
+
   // Achievements
   const [unlockedAchievements, setUnlockedAchievements] = useState<string[]>([]);
   const [achievementPopup, setAchievementPopup] = useState<Achievement | null>(null);
@@ -1188,6 +1191,62 @@ export default function Game() {
             </button>
           </div>
         </aside>
+      </div>
+
+      {/* Game Rules */}
+      <div className="w-full max-w-[760px] mt-4">
+        <div
+          className="panel-card cursor-pointer"
+          style={{ background: showRules ? "#F7F6F3" : "#FFFFFF" }}
+          onClick={() => setShowRules(!showRules)}
+        >
+          <div className="flex justify-between items-center mb-2">
+            <div className="text-[10px] uppercase tracking-[0.08em] text-[#787774] font-medium">遊戲規則</div>
+            <div className="text-[10px] text-[#787774]">{showRules ? "▲" : "▼"}</div>
+          </div>
+          {showRules ? (
+            <div className="flex flex-col gap-4 text-[12px]">
+              <div>
+                <div className="font-semibold mb-1.5 text-[#111111]">遊戲目標</div>
+                <div className="text-[#787774] leading-relaxed">放置數字方塊，讓相鄰三個相同數字自動合併，獲得更高分數，挑戰最高分並解鎖成就。</div>
+              </div>
+
+              <div>
+                <div className="font-semibold mb-1.5 text-[#111111]">合併規則</div>
+                <div className="text-[#787774] leading-relaxed mb-2">當三個或更多相同數字在水平或垂直方向相鄰時，會自動合併成更大的數字。</div>
+                <div className="bg-[#F7F6F3] rounded-lg p-3 text-[11px]">
+                  <div className="flex items-center gap-2 mb-1.5">
+                    <span className="inline-flex items-center justify-center w-[24px] h-[24px] rounded text-[10px] font-semibold" style={{ background: getBlockStyle(2).bg, color: getBlockStyle(2).text }}>2</span>
+                    <span className="text-[#787774]">+</span>
+                    <span className="inline-flex items-center justify-center w-[24px] h-[24px] rounded text-[10px] font-semibold" style={{ background: getBlockStyle(2).bg, color: getBlockStyle(2).text }}>2</span>
+                    <span className="text-[#787774]">+</span>
+                    <span className="inline-flex items-center justify-center w-[24px] h-[24px] rounded text-[10px] font-semibold" style={{ background: getBlockStyle(2).bg, color: getBlockStyle(2).text }}>2</span>
+                    <span className="text-[#787774]">=</span>
+                    <span className="inline-flex items-center justify-center w-[24px] h-[24px] rounded text-[10px] font-semibold" style={{ background: getBlockStyle(6).bg, color: getBlockStyle(6).text }}>6</span>
+                  </div>
+                  <div className="text-[#AAA] text-[10px]">三個 2 合併成一個 6（3 × 2 = 6）</div>
+                </div>
+              </div>
+
+              <div>
+                <div className="font-semibold mb-1.5 text-[#111111]">連擊系統</div>
+                <div className="text-[#787774] leading-relaxed">連續成功合併會累積連擊數，連擊數越高額外加成越多。3 秒內沒有合併，連擊數會重置。</div>
+              </div>
+
+              <div>
+                <div className="font-semibold mb-1.5 text-[#111111]">等級系統</div>
+                <div className="text-[#787774] leading-relaxed">每次合併獲得經驗值，經驗值達到一定數量會提升等級。</div>
+              </div>
+
+              <div>
+                <div className="font-semibold mb-1.5 text-[#111111]">遊戲結束</div>
+                <div className="text-[#787774] leading-relaxed">當方塊堆到頂部無法放置新方塊時遊戲結束。</div>
+              </div>
+            </div>
+          ) : (
+            <div className="text-[11px] text-[#787774]">點擊展開遊戲規則</div>
+          )}
+        </div>
       </div>
     </main>
 
