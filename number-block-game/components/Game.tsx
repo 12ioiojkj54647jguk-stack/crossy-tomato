@@ -1009,8 +1009,72 @@ export default function Game() {
         </div>
       </div>
 
-      {/* Main Content - Canvas + Right Sidebar */}
-      <div className="flex w-full max-w-[760px] items-start justify-center gap-6">
+      {/* Main Content - Left Sidebar + Canvas + Right Sidebar */}
+      <div className="flex w-full max-w-[760px] items-start justify-center gap-4">
+        {/* Left Sidebar - Stats & Achievements */}
+        <aside className="flex w-[180px] shrink-0 flex-col gap-3">
+          {/* Statistics */}
+          <div
+            className="panel-card cursor-pointer"
+            style={{ background: showStats ? "#F7F6F3" : "#FFFFFF" }}
+            onClick={() => setShowStats(!showStats)}
+          >
+            <div className="flex justify-between items-center mb-2">
+              <div className="text-[10px] uppercase tracking-[0.08em] text-[#787774] font-medium">统计</div>
+              <div className="text-[10px] text-[#787774]">{showStats ? "▲" : "▼"}</div>
+            </div>
+            {showStats ? (
+              <div className="flex flex-col gap-1.5">
+                {[
+                  ["游戏时间", formatTime(stats.gameTime)],
+                  ["放置方块", String(stats.totalPieces)],
+                  ["合并次数", String(stats.totalMerges)],
+                  ["最高连击", `×${stats.maxCombo}`],
+                  ["最大合并", `${stats.biggestMerge} 格`],
+                ].map(([label, value]) => (
+                  <div key={label} className="flex justify-between text-[11px]">
+                    <span className="text-[#787774]">{label}</span>
+                    <span className="font-medium text-[#111111] tabular-nums">{value}</span>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-[11px] text-[#787774]">点击展开</div>
+            )}
+          </div>
+
+          {/* Achievements */}
+          <div className="panel-card">
+            <div className="flex justify-between items-center mb-3">
+              <div className="text-[10px] uppercase tracking-[0.08em] text-[#787774] font-medium">成就</div>
+              <div className="text-[10px] px-2 py-0.5 rounded-full" style={{ background: "#F7F6F3", color: "#787774" }}>
+                {unlockedAchievements.length}/{ACHIEVEMENTS.length}
+              </div>
+            </div>
+            <div className="flex flex-wrap gap-1.5">
+              {ACHIEVEMENTS.map((a) => (
+                <div
+                  key={a.id}
+                  className="w-[28px] h-[28px] flex items-center justify-center rounded-lg transition-all duration-200"
+                  style={{
+                    background: unlockedAchievements.includes(a.id)
+                      ? "linear-gradient(135deg, #FBF3DB, #F5E6C8)"
+                      : "#F7F6F3",
+                    border: `1px solid ${unlockedAchievements.includes(a.id) ? "#E5D4A5" : "#EAEAEA"}`,
+                    fontSize: "14px",
+                    opacity: unlockedAchievements.includes(a.id) ? 1 : 0.4,
+                    cursor: "default",
+                    boxShadow: unlockedAchievements.includes(a.id) ? "0 2px 4px rgba(0,0,0,0.08)" : "none",
+                  }}
+                  title={`${a.name}: ${a.description}`}
+                >
+                  {a.icon}
+                </div>
+              ))}
+            </div>
+          </div>
+        </aside>
+
         {/* Canvas */}
         <div className="relative w-[302px] shrink-0 canvas-container" style={{ borderRadius: "12px" }}>
           <canvas
@@ -1018,9 +1082,9 @@ export default function Game() {
             width={BOARD_WIDTH}
             height={BOARD_HEIGHT}
             className="block"
-            style={{ 
-              borderRadius: "12px", 
-              border: "1px solid #E5E5E5", 
+            style={{
+              borderRadius: "12px",
+              border: "1px solid #E5E5E5",
               background: "#FAFAFA",
             }}
             tabIndex={0}
@@ -1124,70 +1188,6 @@ export default function Game() {
             </button>
           </div>
         </aside>
-      </div>
-
-      {/* Bottom Section - Stats & Achievements */}
-      <div className="flex w-full max-w-[760px] gap-4">
-        {/* Statistics */}
-        <div 
-          className="panel-card flex-1 cursor-pointer"
-          style={{ background: showStats ? "#F7F6F3" : "#FFFFFF" }}
-          onClick={() => setShowStats(!showStats)}
-        >
-          <div className="flex justify-between items-center mb-2">
-            <div className="text-[10px] uppercase tracking-[0.08em] text-[#787774] font-medium">统计</div>
-            <div className="text-[10px] text-[#787774]">{showStats ? "▲" : "▼"}</div>
-          </div>
-          {showStats ? (
-            <div className="grid grid-cols-2 gap-x-4 gap-y-1.5">
-              {[
-                ["游戏时间", formatTime(stats.gameTime)],
-                ["放置方块", String(stats.totalPieces)],
-                ["合并次数", String(stats.totalMerges)],
-                ["最高连击", `×${stats.maxCombo}`],
-                ["最大合并", `${stats.biggestMerge} 格`],
-              ].map(([label, value]) => (
-                <div key={label} className="flex justify-between text-[11px]">
-                  <span className="text-[#787774]">{label}</span>
-                  <span className="font-medium text-[#111111] tabular-nums">{value}</span>
-                </div>
-              ))}
-            </div>
-          ) : (
-            <div className="text-[11px] text-[#787774]">点击展开</div>
-          )}
-        </div>
-
-        {/* Achievements */}
-        <div className="panel-card flex-1">
-          <div className="flex justify-between items-center mb-3">
-            <div className="text-[10px] uppercase tracking-[0.08em] text-[#787774] font-medium">成就</div>
-            <div className="text-[10px] px-2 py-0.5 rounded-full" style={{ background: "#F7F6F3", color: "#787774" }}>
-              {unlockedAchievements.length}/{ACHIEVEMENTS.length}
-            </div>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {ACHIEVEMENTS.map((a) => (
-              <div
-                key={a.id}
-                className="w-[32px] h-[32px] flex items-center justify-center rounded-lg transition-all duration-200"
-                style={{
-                  background: unlockedAchievements.includes(a.id) 
-                    ? "linear-gradient(135deg, #FBF3DB, #F5E6C8)" 
-                    : "#F7F6F3",
-                  border: `1px solid ${unlockedAchievements.includes(a.id) ? "#E5D4A5" : "#EAEAEA"}`,
-                  fontSize: "16px",
-                  opacity: unlockedAchievements.includes(a.id) ? 1 : 0.4,
-                  cursor: "default",
-                  boxShadow: unlockedAchievements.includes(a.id) ? "0 2px 4px rgba(0,0,0,0.08)" : "none",
-                }}
-                title={`${a.name}: ${a.description}`}
-              >
-                {a.icon}
-              </div>
-            ))}
-          </div>
-        </div>
       </div>
     </main>
 
